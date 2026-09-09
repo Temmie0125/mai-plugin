@@ -16,6 +16,8 @@
 
 TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）开源项目，按 Yunzai 生态习惯本地化重写。
 
+同时兼容 **OneBot（QQ 号）** 与 **官方 QQBot（openid）** 两种事件协议：绑定与查询以平台用户标识原样落库；openid 环境水鱼按 QQ 代查受限（自动提示改用用户名流或落雪），落雪全功能可用。
+
 ## 命令总览
 
 指令前缀 `#` 或 `/` 均可触发；命令头默认 `mai`，可在配置中修改。发送 `#mai help` 查看完整帮助图。
@@ -26,6 +28,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai bind lxns|df / source / theme
 #mai guess / guessill / fortune / rand / rise
 #mai alias … / push on|off / sync
+#mai 更新 / 强制更新（仅主人）
 ```
 
 口语指令（无需前缀）保留：`来首紫14`、`XX是什么歌`、`我要上20分`、`XX有什么别名` 等。
@@ -66,6 +69,17 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。
 
+## 插件更新
+
+仓库已内置 git 远程（`https://github.com/Temmie0125/mai-plugin`）。主人（超级用户）发送：
+
+- `#mai 更新`：`git pull` 拉取远端更新（本地改动冲突时引导强制更新）；
+- `#mai 强制更新`：`git fetch --all --prune` → `reset --hard origin/main` → `clean`，**放弃本地未提交改动**（自动保留 `resources/static/`、`data/`、`config/config/`、`tests/` 等运行产物与用户数据）。
+
+更新成功会回执最近提交日志；涉及命令/启动逻辑的改动需**重启 Bot** 生效。
+
+自定义分发：改仓库 remote 即可 `git remote set-url origin <你的仓库地址>`。
+
 ## 运行数据
 
 - `data/user.json`：用户绑定与主题（自 NoneBot 版 `user.db` JSON 化）；
@@ -83,8 +97,12 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 ```bash
 cd plugins/mai-plugin
-node --test tests/          # 纯函数单测（配置/数据库/正则/帮助数据）
-node tests/render-help.mjs  # 在 Yunzai 根目录运行：渲染管线冒烟，输出 tests/help.png
+npm test                    # 纯函数单测（node --test "tests/*.test.js"）
+# 渲染冒烟三连（须在 Yunzai 根目录；流程与判定见 docs/visual-acceptance.md）：
+cd <Yunzai根>
+node plugins/mai-plugin/tests/render-pages.mjs     # JS 出图 → tests/out/*.jpg
+node plugins/mai-plugin/tests/refs/make_refs.py    # 源 NoneBot PIL 参照图（需 venv python）
+node plugins/mai-plugin/tests/refs/compare.py      # 数值比对报告
 ```
 
 ## 鸣谢
