@@ -152,3 +152,14 @@ test('migrate-userdb：导入映射 + 幂等 + 只补空字段', async () => {
   assert.deepEqual(users['222'], { qqid: 222, service: 'lxns', theme: 'circle' })
   rmSync(dir, { recursive: true, force: true })
 })
+
+// ---- effectiveService：service 缺失兜底（历史写入丢失场景）----
+test('user.effectiveService：显式值优先 / 凭据兜底 / 缺省 df', async () => {
+  const { effectiveService } = await import('../lib/user.js')
+  assert.equal(effectiveService({ service: 'lxns' }), 'lxns')
+  assert.equal(effectiveService({ service: 'df' }), 'df')
+  assert.equal(effectiveService({ accessToken: 'ak' }), 'lxns')   // 有落雪凭据且 service 缺失
+  assert.equal(effectiveService({ refreshToken: 'rk' }), 'lxns')
+  assert.equal(effectiveService({}), 'df')
+  assert.equal(effectiveService(null), 'df')
+})
