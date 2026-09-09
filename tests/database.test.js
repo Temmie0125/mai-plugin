@@ -49,3 +49,32 @@ test('重启后数据可恢复（load 读取落盘 JSON）', async () => {
   assert.equal(database.getUser(20001).refreshToken, 'rt')
   assert.equal(database.getGroup(30001).aliasPush, true)
 })
+
+test('openid（官方QQBot）用户键：非数字键原样存储且不落 qqid', async () => {
+  await database.load()
+  const openid = '3889698912-7CD510D0ECED42AC8D8D6080EDB77F2E'
+  database.updateUser(openid, { service: 'lxns', accessToken: 'tok', refreshToken: 'rt' })
+  const row = database.getUser(openid)
+  assert.equal(row.service, 'lxns')
+  assert.equal(row.accessToken, 'tok')
+  assert.equal(row.qqid, undefined, 'openid 行不应携带数字 qqid（NaN 污染已消除）')
+  // 数字 QQ 行仍携带 qqid（水鱼代查需要）
+  database.updateUser('114514', { service: 'df' })
+  assert.equal(database.getUser('114514').qqid, 114514)
+  // 重启后两者都还在
+  await database.load()
+  assert.equal(database.getUser(openid).accessToken, 'tok')
+})
+
+test('历史脏行自愈：「null」键带凭据并入唯一无凭据候选行', async () => {
+  await database.load()
+  const openid = '3889698912-ABCDEF0123456789'
+  database.updateUser(openid, { service: 'df', theme: 'prism_plus' }) // 无凭据候选
+  database.updateUser('null', { qqid: 0, friendCode: 123, accessToken: 'tok', service: 'lxns' })
+  await database.load()
+  const merged = database.getUser(openid)
+  assert.equal(merged.accessToken, 'tok')
+  assert.equal(merged.service, 'lxns')
+  assert.equal(merged.friendCode, 123)
+  assert.equal(database.getUser('null'), undefined, '脏行应被清掉')
+})

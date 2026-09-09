@@ -209,7 +209,7 @@ export class MaiSong extends plugin {
     const page = isSay ? parseInt(match[3] || '1', 10) : 1
     const errorMsg = [
       `未找到别名为「${name}」的歌曲`,
-      '※ 可以使用「添加别名」指令给该乐曲添加别名',
+      '※ 发送「#mai alias apply <ID> <别名>」可申请添加（投票功能将在后续版本开放）',
       '※ 如果是歌名的一部分，请使用「查歌」指令查询哦。',
     ].join('\n')
 
@@ -242,7 +242,7 @@ export class MaiSong extends plugin {
         for (const song of aliasData) {
           msg += `${song.song_id}：${song.song_name}\n`
         }
-        msg += '※ 请使用「id xxxxx」查询指定曲目'
+        msg += '※ 发送「#mai song <ID>」可直接按曲目 ID 查询'
         await this.reply(msg.trim(), true)
         return true
       }
@@ -294,7 +294,7 @@ export class MaiSong extends plugin {
       for (const song of [...result].sort((a, b) => a.song_id - b.song_id)) {
         msg += `${songLine(song)}\n`
       }
-      msg += '※ 请使用「id xxxxx」查询指定曲目'
+      msg += '※ 发送「#mai song <ID>」可直接按曲目 ID 查询'
       await this.reply(msg, true)
     } else {
       const image = await drawSongList(result, page)
@@ -305,8 +305,8 @@ export class MaiSong extends plugin {
   }
 
   /** 多候选选曲上下文（§3.4） */
-  async pickSong(e) {
-    return await handlePickSong(this, e)
+  async pickSong() {
+    return await handlePickSong(this)
   }
 }
 

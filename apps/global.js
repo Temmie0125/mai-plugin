@@ -5,14 +5,18 @@
  */
 import plugin from '../../../lib/plugins/plugin.js'
 import { head } from '../lib/config.js'
-import { drawSongGlobalData } from '../lib/handler.js'
+import { drawSongGlobalData, getRatingRanking, rankNameText, rankListText, myRatingRankingText } from '../lib/handler.js'
 import { toSegment } from '../lib/render/picmodle.js'
 import { mai, ensureReady } from '../lib/service.js'
+import { handleErrors } from '../lib/handlerError.js'
+import { getUserAndAuth } from '../lib/user.js'
 import { awaitPickSong, handlePickSong, findSongCandidates } from '../lib/pickSong.js'
 
 const H = () => head()
 
 const REG_GINFO = () => new RegExp(`^[#/]${H()}\\s+ginfo\\s+(.+)$`)
+const REG_RANK = () => new RegExp(`^[#/]${H()}\\s+(?:rank|排行榜)(?:\\s+(.+))?$`)
+const REG_MYRANK = () => new RegExp(`^[#/]${H()}\\s+(?:myrank|我的排名)\\s*$`)
 
 const LEVEL_COLORS = '绿黄红紫白'
 
@@ -25,8 +29,48 @@ export class MaiGlobal extends plugin {
       priority: 100,
       rule: [
         { reg: `^[#/]${H()}\\s+ginfo\\s+(.+)$`, fnc: 'chartGlobal' },
+        { reg: `^[#/]${H()}\\s+(?:rank|排行榜)(?:\\s+(.+))?$`, fnc: 'rank' },
+        { reg: `^[#/]${H()}\\s+(?:myrank|我的排名)\\s*$`, fnc: 'myRank' },
       ],
     })
+  }
+
+  /** #mai rank <用户名|页>（df 公开排行；列表页=合并转发分组节点，降级分段文本） */
+  async rank(e) {
+    const args = ((e.msg.match(REG_RANK()) || [])[1] || '').trim()
+    const data = await handleErrors(async () => await getRatingRanking())
+    if (typeof data === 'string') {
+      await this.reply(data, true)
+      return true
+    }
+    if (args && !/^\d+$/.test(args)) {
+      await this.reply(rankNameText({ ...data, name: args }), true)
+      return true
+    }
+    const page = args ? parseInt(args, 10) : 1
+    const meta = rankListText({ ...data, page })
+    // 页头 + 行分组（≤10 行/节点）+ 页脚，节点数远低于宿主 100 上限
+    const nodes = [meta.text.split('\n')[0]]
+    const bodyLines = meta.text.split('\n').slice(1, -1)
+    for (let i = 0; i < bodyLines.length; i += 10) nodes.push(bodyLines.slice(i, i + 10).join('\n'))
+    nodes.push(meta.text.split('\n').slice(-1)[0])
+    try {
+      const common = (await import('../../../lib/common/common.js')).default
+      const fwd = await common.makeForwardMsg(e, nodes)
+      await this.reply(fwd, true)
+    } catch {
+      await this.reply(nodes.join('\n'), true)
+    }
+    return true
+  }
+
+  /** #mai myrank / #mai 我的排名（支持 @ 他人；源无错误捕获的缺陷此处经 handleErrors 补文案） */
+  async myRank(e) {
+    const got = await getUserAndAuth(e, { autoCreate: true, allowAt: true })
+    if (!got) return true
+    const text = await handleErrors(async () => await myRatingRankingText(got.user.qqid))
+    await this.reply(text, true)
+    return true
   }
 
   async chartGlobal(e) {
@@ -78,7 +122,7 @@ export class MaiGlobal extends plugin {
   }
 
   /** 多候选选曲上下文（§3.4） */
-  async pickSong(e) {
-    return await handlePickSong(this, e)
+  async pickSong() {
+    return await handlePickSong(this)
   }
 }

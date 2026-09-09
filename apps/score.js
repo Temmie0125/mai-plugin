@@ -96,7 +96,7 @@ export class MaiScore extends plugin {
   }
 
   /** 多候选选曲上下文（§3.4） */
-  async pickSong(e) {
-    return await handlePickSong(this, e)
+  async pickSong() {
+    return await handlePickSong(this)
   }
 }

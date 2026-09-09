@@ -2,78 +2,246 @@
   {
     "group": "查询成绩",
     "list": [
-      { "title": "b50 [用户名]", "eg": "#{head} b50", "desc": "查询 B50 最佳成绩（@他人可查对方）" },
-      { "title": "ap50 [用户名]", "eg": "#{head} ap50", "desc": "查询 AP50 最佳成绩（仅落雪数据源）" },
-      { "title": "score <曲名|id|别名> [难度色]", "eg": "#{head} score 茄子 紫", "desc": "查询单曲成绩与谱面信息" },
-      { "title": "ginfo <曲名|id> [难度色]", "eg": "#{head} ginfo 茄子", "desc": "查询单曲全服统计数据" },
-      { "title": "song <关键词> [页]", "eg": "#{head} song 定数14", "desc": "查歌：曲名/别名/定数/bpm/曲师/谱师过滤" },
-      { "title": "what <词>", "eg": "#{head} what 嗦", "desc": "根据别名反查歌曲" },
-      { "title": "fsline <分数线> [容错]", "eg": "#{head} fsline 100.5", "desc": "计算目标达成率的分数线" },
-      { "title": "rank [页码|用户名]", "eg": "#{head} rank 2", "desc": "水鱼 Rating 排行榜" },
-      { "title": "myrank", "eg": "#{head} myrank", "desc": "查询我的 Rating 排名" }
+      {
+        "title": "b50 [用户名]",
+        "eg": "#{head} b50",
+        "desc": "查询 B50 最佳成绩（@他人可查对方）"
+      },
+      {
+        "title": "ap50 [用户名]",
+        "eg": "#{head} ap50",
+        "desc": "查询 AP50 最佳成绩（仅落雪数据源）"
+      },
+      {
+        "title": "score <曲名|id|别名> [难度色]",
+        "eg": "#{head} score 茄子 紫",
+        "desc": "查询单曲成绩与谱面信息"
+      },
+      {
+        "title": "ginfo <曲名|id> [难度色]",
+        "eg": "#{head} ginfo 茄子",
+        "desc": "查询单曲全服统计数据"
+      },
+      {
+        "title": "song <关键词> [页]",
+        "eg": "#{head} song 定数14",
+        "desc": "查歌：曲名/别名/定数/bpm/曲师/谱师过滤"
+      },
+      {
+        "title": "what <词>",
+        "eg": "#{head} what 嗦",
+        "desc": "根据别名反查歌曲"
+      },
+      {
+        "title": "fsline <分数线> [容错]",
+        "eg": "#{head} fsline 100.5",
+        "desc": "计算目标达成率的分数线"
+      },
+      {
+        "title": "rank [页码|用户名]",
+        "eg": "#{head} rank 2",
+        "desc": "水鱼 Rating 排行榜"
+      },
+      {
+        "title": "myrank",
+        "eg": "#{head} myrank",
+        "desc": "查询我的 Rating 排名"
+      }
     ]
   },
   {
     "group": "表格成绩",
     "list": [
-      { "title": "table <定数>", "eg": "#{head} table 14", "desc": "查看指定定数的歌曲表" },
-      { "title": "plate <定数> <条件>", "eg": "#{head} plate 14 fc", "desc": "完成表：fc/ap/fs/fsd/sss 等条件" },
-      { "title": "plate <版本称号> [页]", "eg": "#{head} plate 真极", "desc": "版本牌子完成表（如：真极）" },
-      { "title": "plate <版本称号> 进度", "eg": "#{head} plate 真极 进度", "desc": "版本牌子完成进度" },
-      { "title": "plateinfo", "eg": "#{head} plateinfo", "desc": "牌子条件说明" },
-      { "title": "progress <定数> <目标> [页]", "eg": "#{head} progress 14 ap", "desc": "等级达成进度" },
-      { "title": "list <定数> [页]", "eg": "#{head} list 14", "desc": "指定等级分数列表" }
+      {
+        "title": "table <定数>",
+        "eg": "#{head} table 14",
+        "desc": "查看指定定数的歌曲表"
+      },
+      {
+        "title": "plate <定数> <条件>",
+        "eg": "#{head} plate 14 fc",
+        "desc": "完成表：fc/ap/fs/fsd/sss 等条件"
+      },
+      {
+        "title": "plate <版本称号> [页]",
+        "eg": "#{head} plate 真极",
+        "desc": "版本牌子完成表（如：真极）"
+      },
+      {
+        "title": "plate <版本称号> 进度",
+        "eg": "#{head} plate 真极 进度",
+        "desc": "版本牌子完成进度"
+      },
+      {
+        "title": "plateinfo",
+        "eg": "#{head} plateinfo",
+        "desc": "牌子条件说明"
+      },
+      {
+        "title": "progress <定数> <目标> [页]",
+        "eg": "#{head} progress 14 ap",
+        "desc": "等级达成进度"
+      },
+      {
+        "title": "list <定数> [页]",
+        "eg": "#{head} list 14",
+        "desc": "指定等级分数列表"
+      }
     ]
   },
   {
     "group": "绑定与设置",
     "list": [
-      { "title": "bind lxns", "eg": "#{head} bind lxns", "desc": "绑定落雪（授权码流）" },
-      { "title": "bind df", "eg": "#{head} bind df", "desc": "绑定水鱼（设备授权流）" },
-      { "title": "source [lxns|df]", "eg": "#{head} source lxns", "desc": "查看/切换数据源（凭据互不冲突）" },
-      { "title": "theme <主题>", "eg": "#{head} theme circle", "desc": "切换渲染主题（prism_plus/circle）" }
+      {
+        "title": "bind lxns",
+        "eg": "#{head} bind lxns",
+        "desc": "绑定落雪（授权码流；完成后自动切换数据源）"
+      },
+      {
+        "title": "bind df",
+        "eg": "#{head} bind df",
+        "desc": "绑定水鱼（服务端授权，链接即完成）"
+      },
+      {
+        "title": "source <0|1|lxns|df>",
+        "eg": "#{head} source 1",
+        "desc": "切换数据源（数字或别名；绑定落雪后已自动切换）"
+      },
+      {
+        "title": "theme <0|1|prism_plus|circle>",
+        "eg": "#{head} theme 1",
+        "desc": "切换渲染主题（数字或主题名）"
+      }
     ]
   },
   {
     "group": "娱乐互动",
     "list": [
-      { "title": "guess", "eg": "#{head} guess", "desc": "猜歌游戏" },
-      { "title": "guessill", "eg": "#{head} guessill", "desc": "猜曲绘游戏" },
-      { "title": "guess on|off / reset", "eg": "#{head} guess on", "desc": "开启/关闭/重置猜歌（群管）" },
-      { "title": "fortune", "eg": "#{head} fortune", "desc": "今日舞萌运势" },
-      { "title": "rand [类型][颜色][定数]", "eg": "#{head} rand dx紫14", "desc": "随机谱面" },
-      { "title": "rise [等级] [分数]", "eg": "#{head} rise 14 20", "desc": "上分推荐" },
-      { "title": "*随机 <段位>", "eg": "#{head} 随机超上", "desc": "随机段位挑战*(开发中)" }
+      {
+        "title": "guess",
+        "eg": "#{head} guess",
+        "desc": "猜歌游戏"
+      },
+      {
+        "title": "guessill",
+        "eg": "#{head} guessill",
+        "desc": "猜曲绘游戏"
+      },
+      {
+        "title": "guess on|off / reset",
+        "eg": "#{head} guess on",
+        "desc": "开启/关闭/重置猜歌（群管）"
+      },
+      {
+        "title": "fortune",
+        "eg": "#{head} fortune",
+        "desc": "今日舞萌运势"
+      },
+      {
+        "title": "rand [类型][颜色][定数]",
+        "eg": "#{head} rand dx紫14",
+        "desc": "随机谱面"
+      },
+      {
+        "title": "rise [等级] [分数]",
+        "eg": "#{head} rise 14 20",
+        "desc": "上分推荐"
+      },
+      {
+        "title": "*随机 <段位>",
+        "eg": "#{head} 随机超上",
+        "desc": "随机段位挑战*(开发中)"
+      }
     ]
   },
   {
     "group": "别名",
     "list": [
-      { "title": "alias <曲名>", "eg": "#{head} alias 茄子", "desc": "查看歌曲别名" },
-      { "title": "alias apply <id> <别名>", "eg": "#{head} alias apply 277 脑天", "desc": "申请新别名（群内投票）" },
-      { "title": "alias votes [页] / vote <标签>", "eg": "#{head} alias votes", "desc": "查看投票 / 同意别名" },
-      { "title": "alias local <id> <别名>", "eg": "#{head} alias local 799 茄", "desc": "添加本地别名" },
-      { "title": "alias sync", "eg": "#{head} alias sync", "desc": "更新别名库（管理员）" },
-      { "title": "push on|off", "eg": "#{head} push on", "desc": "群别名推送开关（群管）" },
-      { "title": "push global on|off", "eg": "#{head} push global on", "desc": "全局别名推送开关（管理员）" }
+      {
+        "title": "alias <曲名>",
+        "eg": "#{head} alias 茄子",
+        "desc": "查看歌曲别名"
+      },
+      {
+        "title": "alias apply <id> <别名>",
+        "eg": "#{head} alias apply 277 脑天",
+        "desc": "申请新别名（群内投票）"
+      },
+      {
+        "title": "alias votes [页] / vote <标签>",
+        "eg": "#{head} alias votes",
+        "desc": "查看投票 / 同意别名"
+      },
+      {
+        "title": "alias local <id> <别名>",
+        "eg": "#{head} alias local 799 茄",
+        "desc": "添加本地别名"
+      },
+      {
+        "title": "alias sync",
+        "eg": "#{head} alias sync",
+        "desc": "更新别名库（管理员）"
+      },
+      {
+        "title": "push on|off",
+        "eg": "#{head} push on",
+        "desc": "群别名推送开关（群管）"
+      },
+      {
+        "title": "push global on|off",
+        "eg": "#{head} push global on",
+        "desc": "全局别名推送开关（管理员）"
+      }
     ]
   },
   {
     "group": "管理",
     "list": [
-      { "title": "sync", "eg": "#{head} sync", "desc": "同步曲库/别名/牌子数据（管理员私聊）" },
-      { "title": "help / 帮助", "eg": "#{head} help", "desc": "查看本帮助" }
+      {
+        "title": "sync",
+        "eg": "#{head} sync",
+        "desc": "同步曲库/别名/牌子数据（管理员私聊）"
+      },
+      {
+        "title": "help / 帮助",
+        "eg": "#{head} help",
+        "desc": "查看本帮助"
+      }
     ]
   },
   {
     "group": "口语指令（无需命令头）",
     "list": [
-      { "title": "XXmai…什么", "eg": "今天mai什么", "desc": "随机一首歌 / 带上分字样时推荐上分曲目" },
-      { "title": "来首/随个/给个 [dx|sd][颜色]<定数>", "eg": "来首紫14", "desc": "随机谱面" },
-      { "title": "我要在<等级>上<分数>分", "eg": "我要在13+上1分", "desc": "推荐上分乐曲" },
-      { "title": "<曲名>是什么歌", "eg": "齧髅是什么歌", "desc": "反查这句话对应的歌曲" },
-      { "title": "<曲名>有什么别名", "eg": "茄子有什么别名", "desc": "查询曲目别名" },
-      { "title": "<版本称号>完成表 / 舞进度", "eg": "真极完成表", "desc": "版本牌子完成表 / 进度" }
+      {
+        "title": "XXmai…什么",
+        "eg": "今天mai什么",
+        "desc": "随机一首歌 / 带上分字样时推荐上分曲目"
+      },
+      {
+        "title": "来首/随个/给个 [dx|sd][颜色]<定数>",
+        "eg": "来首紫14",
+        "desc": "随机谱面"
+      },
+      {
+        "title": "我要在<等级>上<分数>分",
+        "eg": "我要在13+上1分",
+        "desc": "推荐上分乐曲"
+      },
+      {
+        "title": "<曲名>是什么歌",
+        "eg": "齧髅是什么歌",
+        "desc": "反查这句话对应的歌曲"
+      },
+      {
+        "title": "<曲名>有什么别名",
+        "eg": "茄子有什么别名",
+        "desc": "查询曲目别名"
+      },
+      {
+        "title": "<版本称号>完成表 / 舞进度",
+        "eg": "真极完成表",
+        "desc": "版本牌子完成表 / 进度"
+      }
     ]
   }
 ]
