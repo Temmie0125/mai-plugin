@@ -1,0 +1,13 @@
+# 静态资源包（用户自行复制/下载，不入库，见 README「安装与资源」）
+resources/static/
+
+# 运行时数据与产物
+data/
+temp/
+
+# 用户配置副本（出厂默认在 config/default_config/）
+config/config/
+
+node_modules/
+docs/
+tests/

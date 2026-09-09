@@ -1,0 +1,50 @@
+# mai-plugin 出厂默认配置
+# 用户配置请修改 config/config/config.yaml（首次启动自动复制生成）
+
+# ===== 命令 =====
+# 命令头词：触发「#mai …」的词，可改为 maimai / maidx 等任意词（修改后需重启生效）
+cmdhead: mai
+
+# ===== 基础 =====
+# BOT 名称（授权链接等文案中使用；留空则取宿主 bot 昵称）
+botName: ''
+# 柚子别名服务器 cn 镜像（网络环境不佳时开启）
+aliasProxy: false
+# 别名推送总开关（SSE/WS 推送新别名到开启的群）
+aliasPush: true
+
+# ===== 素材 =====
+# 素材内存化：启动时将官方切图预载入内存（加快渲染，占用更多内存）
+saveInMemory: true
+# 在线素材回退：本地缺失的曲绘/切图尝试从在线源获取
+assetsOnline: true
+
+# ===== 水鱼查分器（Diving-Fish） =====
+# 使用代理服务器访问水鱼查分器 API
+proberProxy: false
+# 水鱼 OAuth 应用（两者都配置后才启用「绑定水鱼」授权）
+dfClientId: ''
+dfClientSecret: ''
+dfAuthUrl: 'https://auth.diving-fish.com'
+
+# ===== 落雪查分器（LXNS） =====
+# 落雪开发者 Token（使用落雪数据源查分必需）
+lxnsDevToken: ''
+# 落雪 OAuth 应用（三者都配置后「绑定落雪」才可用授权码流）
+lxClientId: ''
+lxClientSecret: ''
+lxRedirectUri: ''
+# 落雪绑定仅限私聊
+lxnsBindPrivateOnly: false
+
+# ===== 渲染 =====
+# 截图 jpeg 质量（0-100）
+renderQuality: 92
+# 截图超时（毫秒）
+renderTimeout: 20000
+
+# ===== 列表 =====
+# 列表类页面单页最大行数
+helpMaxRows: 60
+# 分页大小（多候选选曲、投票列表等）
+pageSize: 10

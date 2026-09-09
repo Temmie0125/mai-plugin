@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<!-- 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @font-face {
+      font-family: 'mai-rounded';
+      src: url('{{_resPath}}/static/font/ResourceHanRoundedCN-Bold.ttf');
+    }
+    @font-face {
+      font-family: 'mai-torus';
+      src: url('{{_resPath}}/static/font/Torus SemiBold.otf');
+    }
+
+    body {
+      width: 1400px;
+      font-family: 'mai-rounded', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+      color: #333;
+      /* 奶油白底 + 彩虹柔光斑（对齐原版 maimaidxhelp.png 底色氛围） */
+      background:
+        radial-gradient(ellipse 620px 480px at 6% 4%, rgba(255,170,200,0.55), transparent 70%),
+        radial-gradient(ellipse 700px 520px at 96% 8%, rgba(160,210,255,0.50), transparent 70%),
+        radial-gradient(ellipse 560px 460px at 10% 92%, rgba(255,215,150,0.55), transparent 70%),
+        radial-gradient(ellipse 660px 500px at 94% 90%, rgba(255,150,180,0.45), transparent 70%),
+        radial-gradient(ellipse 500px 400px at 55% 50%, rgba(200,255,230,0.35), transparent 70%),
+        linear-gradient(160deg, #fff9f2 0%, #fdf3ec 50%, #fbeef2 100%);
+    }
+
+    #container { padding: 44px 48px 30px; }
+
+    /* ===== 标题 ===== */
+    .header { text-align: center; margin-bottom: 26px; }
+    .header h1 {
+      font-size: 52px; letter-spacing: 4px; color: #ff5f8f;
+      text-shadow: 0 2px 0 rgba(255,255,255,0.8);
+    }
+    .header .ver { font-family: 'mai-torus', 'mai-rounded', sans-serif; font-size: 20px; color: rgba(0,0,0,0.35); }
+
+    /* ===== 紧凑三列：每列独立堆叠（masonry 式），无行对齐断档 ===== */
+    .grid { display: flex; gap: 22px; align-items: stretch; }
+    .col {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 22px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.88);
+      border-radius: 20px;
+      padding: 22px 24px 14px;
+      box-shadow: 0 4px 18px rgba(230,150,170,0.18);
+    }
+    .card .group {
+      display: inline-block; font-size: 26px; margin-bottom: 14px;
+      padding: 3px 20px; border-radius: 999px;
+      background: #ffe3ec; color: #ff5f8f;
+    }
+
+    /* 组内表格行：指令 | 示例·说明 */
+    .row { display: flex; gap: 14px; padding: 7px 2px; border-bottom: 1px dashed rgba(0,0,0,0.08); }
+    .row:last-child { border-bottom: none; }
+    .row .cmd {
+      flex: 0 0 44%;
+      font-family: 'mai-torus', 'mai-rounded', monospace;
+      font-size: 21px; color: #2a9db8; line-height: 1.35;
+    }
+    .row .info { flex: 1; }
+    .row .info .desc { font-size: 18px; color: #555; line-height: 1.4; }
+    .row .info .eg {
+      font-family: 'mai-torus', 'mai-rounded', monospace;
+      font-size: 17px; color: rgba(0,0,0,0.38);
+    }
+
+    /* ===== 参数说明卡（第三列底部） ===== */
+    .sidecard .group { background: #dff1ff; color: #3a8fd4; }
+    .kv { padding: 6px 2px; border-bottom: 1px dashed rgba(0,0,0,0.08); font-size: 19px; }
+    .kv:last-child { border-bottom: none; }
+    .kv b { color: #3a8fd4; font-weight: normal; margin-right: 8px; }
+    .kv span { color: #666; font-size: 17.5px; }
+    .diffs { display: flex; gap: 8px; margin-top: 4px; }
+    .diffs i {
+      font-style: normal; font-size: 16px; color: #fff;
+      width: 30px; height: 30px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .note { font-size: 16.5px; color: #999; line-height: 1.6; margin-top: 10px; }
+
+    /* ===== 版权卡：横贯底部通栏（三列等高底部之下） ===== */
+    .powered {
+      margin-top: 22px;
+      display: flex; align-items: center; justify-content: center;
+      gap: 26px;
+      padding: 18px 24px;
+      text-align: left;
+    }
+    .powered .logo-img { height: 84px; width: auto; }
+    .powered .desc { font-size: 17px; color: #888; line-height: 1.7; }
+
+    /* ===== 页脚 ===== */
+    .footer {
+      margin-top: 24px; padding-top: 14px;
+      border-top: 1px solid rgba(0,0,0,0.08);
+      display: flex; justify-content: space-between;
+      font-size: 17px; color: rgba(0,0,0,0.40);
+    }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div class="header">
+    <h1>舞萌DX 帮助</h1>
+    <div class="ver">{{version}} · 前缀 # 或 / 均可触发 · 以下示例均以 #{{cmdHead}} 为例</div>
+  </div>
+
+  <div class="grid">
+    {{each columns column ci}}
+    <div class="col">
+      {{each column group}}
+      <div class="card">
+        <div class="group">{{group.group}}</div>
+        {{each group.list item}}
+        <div class="row">
+          <div class="cmd">{{item.title}}</div>
+          <div class="info">
+            <div class="desc">{{item.desc}}</div>
+            {{if item.eg}}<div class="eg">{{item.eg}}</div>{{/if}}
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{/each}}
+      {{if ci === 2}}
+      <div class="card sidecard">
+        <div class="group">参数说明</div>
+        <div class="kv"><b>[]</b><span>必带参数</span></div>
+        <div class="kv"><b>&lt;&gt;</b><span>可选参数</span></div>
+        <div class="kv"><b>难度色</b><span>绿 黄 红 紫 白</span></div>
+        <div class="kv"><b>定数</b><span>谱面定数，如 13.6</span></div>
+        <div class="kv"><b>条件</b><span>fc / ap / fs / fsd / sss 等</span></div>
+        <div class="kv"><b>曲名</b><span>支持 id、标题、别名</span></div>
+        <div class="kv">
+          <b>难度色标</b>
+          <div class="diffs">
+            <i style="background:#81d955">绿</i>
+            <i style="background:#f5bd15">黄</i>
+            <i style="background:#ff818d">红</i>
+            <i style="background:#9f51dc">紫</i>
+            <i style="background:#e6c5ff">白</i>
+          </div>
+        </div>
+        <div class="note">命令头可在 config.yaml 中修改（cmdhead），改后需重启。<br>口语指令与命令头指令行为一致，无需加前缀。</div>
+      </div>
+      {{/if}}
+    </div>
+    {{/each}}
+  </div>
+
+  <div class="card powered">
+    <img class="logo-img" src="{{_resPath}}/icons/maimai.png">
+    <div class="desc">Powered by maimaidx · 移植自 nonebot-plugin-maimaidx<br>美术设计派生自 Yuri-YuzuChaN / mai-bot</div>
+  </div>
+
+  <div class="footer">
+    <span>{{version}} · 发送 #{{cmdHead}} 帮助 随时查看本图</span>
+    <span>Powered by mai-plugin</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "mai-plugin",
+  "version": "0.1.0",
+  "description": "TRSS-Yunzai 舞萌DX 查询插件（移植自 nonebot-plugin-maimaidx）",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "GPL-3.0-or-later"
+}
