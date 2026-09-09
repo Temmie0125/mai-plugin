@@ -2,7 +2,7 @@
  * @Author: Temmie0125 1179755948@qq.com
  * @Date: 2026-09-09 14:46:59
  * @LastEditors: Temmie0125 1179755948@qq.com
- * @LastEditTime: 2026-09-09 19:10:01
+ * @LastEditTime: 2026-09-09 19:14:17
  * @FilePath: \实验与作业e:\bot\Yunzai\plugins\mai-plugin\README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -74,7 +74,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 ## 美术与版权声明（必读）
 
-本插件的卡面布局、切图组合与配色方案**派生自 nonebot-plugin-maimaidx（作者 Yuri-YuzuChaN，https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx）及上游 mai-bot 项目的美术设计**，仅作信息级还原复用，相关权利归原作者所有，感谢其开源贡献。
+本插件的卡面布局、切图组合与配色方案**派生自 nonebot-plugin-maimaidx（作者 Yuri-YuzuChaN，https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx） 的美术设计**，仅作信息级还原复用，相关权利归原作者所有，感谢其开源贡献。
 
 - 舞萌DX 相关素材版权归 SEGA 等原权利方所有，素材包由用户自行下载，请于 24 小时内自行删除或支持正版；
 - 资源包内字体仅限个人学习研究，禁止商用；
