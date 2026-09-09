@@ -1,3 +1,11 @@
+<!--
+ * @Author: Temmie0125 1179755948@qq.com
+ * @Date: 2026-09-09 14:46:59
+ * @LastEditors: Temmie0125 1179755948@qq.com
+ * @LastEditTime: 2026-09-09 19:10:01
+ * @FilePath: \实验与作业e:\bot\Yunzai\plugins\mai-plugin\README.md
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+-->
 # mai-plugin
 
 <p align="center">
@@ -6,7 +14,7 @@
   </p>
 </p>
 
-TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）及上游 mai-bot 开源项目，按 Yunzai 生态习惯本地化重写。
+TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）开源项目，按 Yunzai 生态习惯本地化重写。
 
 ## 命令总览
 
@@ -30,7 +38,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 
 ```bash
 cd <Yunzai根>/plugins
-git clone <仓库地址> mai-plugin   # 或直接解压到 plugins/mai-plugin
+git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解压到 plugins/mai-plugin
 ```
 
 ### 2. 静态资源包（必需，约 600MB，不入 git 仓库）
@@ -45,7 +53,7 @@ git clone <仓库地址> mai-plugin   # 或直接解压到 plugins/mai-plugin
 
   要求复制后存在 `static/mai/`、`static/font/`、`static/data/`、`static/echarts.min.js` 同级结构（与源包零差异）。`static/data/user.db` 是旧用户数据库，可一并复制供迁移（P2 提供导入脚本）；不复制则重新绑定。
 
-- **新用户**：下载静态资源包压缩包（发布时填充直链），解压到 `plugins/mai-plugin/resources/`，保证目录结构为 `resources/static/mai/...`。
+- **新用户**：下载静态资源包压缩包（请前往[源项目主页](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)进行下载），解压到 `plugins/mai-plugin/resources/`，保证目录结构为 `resources/static/mai/...`。
 
 启动时自动检测：曲绘数 < 500 会红字告警并引导。缺失单项素材渲染时在线回退（可配 `assetsOnline`）。
 
@@ -70,7 +78,6 @@ git clone <仓库地址> mai-plugin   # 或直接解压到 plugins/mai-plugin
 
 - 舞萌DX 相关素材版权归 SEGA 等原权利方所有，素材包由用户自行下载，请于 24 小时内自行删除或支持正版；
 - 资源包内字体仅限个人学习研究，禁止商用；
-- 详见资源包内 `COPYRIGHT.txt`。
 
 ## 开发
 
@@ -83,6 +90,5 @@ node tests/render-help.mjs  # 在 Yunzai 根目录运行：渲染管线冒烟，
 ## 鸣谢
 
 - [Yuri-YuzuChaN/nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx) —— 美术设计与功能蓝本
-- [mai-bot](https://github.com/mai-bot/mai-bot) —— 上游项目
 - [Catrong/phi-plugin](https://github.com/Catrong/phi-plugin) —— Yunzai 侧架构范式参考
 - TRSS-Yunzai 团队
