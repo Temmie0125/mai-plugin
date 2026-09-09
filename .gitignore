@@ -14,3 +14,6 @@ docs/
 # 渲染冒烟产物（不入库）
 tests/out/
 tests/*.jpg
+
+# claude
+.claude/

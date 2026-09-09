@@ -2,6 +2,8 @@
 
 <p align="center">
   <img src="resources/icons/plugin_icon.png" width="128" alt="mai-plugin">
+  <p align="center">TRSS-Yunzai 舞萌DX插件
+  </p>
 </p>
 
 TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）及上游 mai-bot 开源项目，按 Yunzai 生态习惯本地化重写。
