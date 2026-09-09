@@ -3,13 +3,13 @@
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  */
 import plugin from '../../../lib/plugins/plugin.js'
-import Config from '../lib/config.js'
+import Config, { head } from '../lib/config.js'
 import { renderHelp, toSegment } from '../lib/render/picmodle.js'
 import { checkReadiness } from '../lib/render/assets.js'
 import pkg from '../package.json' with { type: 'json' }
 const { version } = pkg
 
-const H = () => Config.getUserCfg('config', 'cmdhead')
+const H = () => head()
 
 export class MaiBase extends plugin {
   constructor() {

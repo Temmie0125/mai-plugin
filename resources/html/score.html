@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!-- 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN，https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx）及上游 mai-bot -->
+<!-- 单曲成绩卡：源 core/image/info.py song_play_data 坐标直译（1200×900 主题背景 play_info.png） -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @font-face { font-family: 'mai-sy'; src: url('{{_staticPath}}/font/ResourceHanRoundedCN-Bold.ttf'); }
+    @font-face { font-family: 'mai-tb'; src: url('{{_staticPath}}/font/Torus%20SemiBold.otf'); }
+    @font-face { font-family: 'mai-fot'; src: url('{{_staticPath}}/font/FOT-NewRodin%20Pro%20EB.otf'); }
+
+    #container {
+      position: relative;
+      width: {{width}}px;
+      height: {{height}}px;
+      background: url('{{bg}}') no-repeat 0 0 / {{width}}px {{height}}px;
+      font-family: 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+      overflow: hidden;
+    }
+    .abs { position: absolute; }
+    img.abs { display: block; }
+    .txt {
+      position: absolute;
+      width: max-content;
+      white-space: nowrap;
+      line-height: 1;
+      transform-origin: 0 0;
+    }
+    .a-lt { }
+    .a-lm { transform: translateY(-50%); }
+    .a-rm { transform: translate(-100%, -50%); }
+    .a-mm { transform: translate(-50%, -50%); }
+    .f-sy { font-family: 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-tb { font-family: 'mai-tb', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-fot { font-family: 'mai-fot', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+  </style>
+</head>
+<body>
+<div id="container">
+  {{each images im}}
+  <img class="abs" src="{{im.src}}" {{if im.w}}width="{{im.w}}" height="{{im.h}}"{{/if}}
+       style="left:{{im.x}}px;top:{{im.y}}px;z-index:{{im.z}};"
+       {{if im.fallback}}onerror="this.onerror=null;this.src='{{im.fallback}}'"{{/if}}>
+  {{/each}}
+  {{each texts t}}
+  <div class="txt a-{{t.anchor}} f-{{t.font}}"
+       style="left:{{t.x}}px;top:{{t.y}}px;font-size:{{t.size}}px;color:{{t.color}};z-index:{{t.z}};{{if t.shadow}}text-shadow:{{t.shadow}};{{/if}}">{{t.text}}</div>
+  {{/each}}
+</div>
+</body>
+</html>

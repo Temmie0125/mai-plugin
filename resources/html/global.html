@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!-- 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN，https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx）及上游 mai-bot -->
+<!-- 全服统计饼图：源 core/image/chart.py song_global_data（pyecharts 双环饼 → ECharts 同参复刻，1000×800） -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fff; }
+    #container { position: relative; width: {{width}}px; height: {{height}}px; }
+    #pie { width: {{width}}px; height: {{height}}px; }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div id="pie"></div>
+</div>
+<script>{{@ echartsJs}}</script>
+<script>
+  var PIE_TITLE = {{@ titleJson}};
+  var FC_DATA = {{@ fcDataJson}};
+  var ACC_DATA = {{@ accDataJson}};
+
+  var RICH = {
+    a: { color: '#999', lineHeight: 22, align: 'center' },
+    abg: { backgroundColor: '#e3e3e3', width: '100%', align: 'right', height: 22, borderRadius: [4, 4, 0, 0] },
+    hr: { borderColor: '#aaa', width: '100%', borderWidth: 0.5, height: 0 },
+    b: { fontSize: 16, lineHeight: 33 },
+    per: { color: '#eee', backgroundColor: '#334455', padding: [2, 4], borderRadius: 2 }
+  };
+  var LABEL = {
+    position: 'outside',
+    formatter: '{a|{a}}{abg|}\n{hr|}\n {b|{b}: }{c}  {per|{d}%}  ',
+    backgroundColor: '#eee',
+    borderColor: '#aaa',
+    borderWidth: 1,
+    borderRadius: 4,
+    rich: RICH
+  };
+
+  var chart = echarts.init(document.getElementById('pie'), null, { width: {{width}}, height: {{height}} });
+  chart.setOption({
+    animation: false,
+    backgroundColor: '#fff',
+    title: { text: PIE_TITLE, left: 'center', top: 20, textStyle: { color: '#2c343c' } },
+    legend: { left: 15, top: 10, orient: 'vertical' },
+    tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+    series: [
+      { name: '全连等级', type: 'pie', radius: ['0%', '30%'], data: FC_DATA, label: LABEL },
+      { name: '达成率等级', type: 'pie', radius: ['50%', '70%'], clockwise: true, data: ACC_DATA, label: LABEL }
+    ]
+  });
+</script>
+</body>
+</html>

@@ -10,4 +10,7 @@ config/config/
 
 node_modules/
 docs/
-tests/
+
+# 渲染冒烟产物（不入库）
+tests/out/
+tests/*.jpg

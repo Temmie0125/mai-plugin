@@ -16,8 +16,11 @@ import { fileURLToPath } from 'node:url'
 import Config from './lib/config.js'
 import * as database from './lib/database.js'
 import { checkReadiness } from './lib/render/assets.js'
+import { mai } from './lib/service.js'
 import pkg from './package.json' with { type: 'json' }
 const { version } = pkg
+
+const logger = global.logger || console
 
 // 1) 配置初始化（构造时已完成 default_config → config 复制）
 Config.initCfg()
@@ -25,10 +28,12 @@ Config.initCfg()
 // 2) 用户/群数据载入
 await database.load()
 
-// 3) 曲库加载（P1 接入：mai.getMusic → getMusicAlias → getPlateJson，失败 lazy 重试）
-// TODO(P1): data/music/ 缓存加载与增量校验
-
-const logger = global.logger || console
+// 3) 曲库加载（设计 §6.1/§10.1：data/music 缓存 → static/data 导入 → 联网重建；失败由命令惰性重试）
+try {
+  await mai.init({ network: true })
+} catch (error) {
+  logger.error('[mai-plugin] 曲库初始化异常：', error?.message || error)
+}
 
 logger.mark('-------mai-plugin-------')
 
@@ -76,9 +81,13 @@ for (const [i, file] of files.entries()) {
     continue
   }
   const mod = ret.value
-  const key = file.replace('.js', '')
-  // 每个文件导出一个 class extends plugin
-  apps[key] = mod[Object.keys(mod)[0]]
+  // 收集文件导出的**全部类**（允许一文件多类：口语兜底类等）；纯函数导出跳过。
+  // 判类不能用 prototype 存在性（function 亦有 prototype/constructor），用声明形态区分
+  for (const [name, value] of Object.entries(mod)) {
+    if (typeof value === 'function' && /^\s*class\s/.test(Function.prototype.toString.call(value))) {
+      apps[name] = value
+    }
+  }
 }
 
 logger.mark(`[mai-plugin] v${version} 载入完成 · 命令头「${Config.getUserCfg('config', 'cmdhead')}」`)

@@ -4,7 +4,7 @@
   "description": "TRSS-Yunzai 舞萌DX 查询插件（移植自 nonebot-plugin-maimaidx）",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test \"tests/*.test.js\""
   },
   "engines": {
     "node": ">=18"
