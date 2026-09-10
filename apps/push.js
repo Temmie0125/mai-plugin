@@ -15,6 +15,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import { head } from '../lib/config.js'
 import { updateGroup, updateGroups } from '../lib/database.js'
+import { reevaluate } from '../lib/aliasSse.js'
 
 const logger = global.logger || console
 
@@ -82,7 +83,9 @@ export class MaiPush extends plugin {
     const on = (e.msg.match(REG_PUSH_GROUP()) || [])[1] === 'on'
     updateGroup(e.group_id, { aliasPush: on })
     await this.reply(on ? '群别名推送功能已开启' : '群别名推送功能已关闭', true)
-    // P3e 接缝：白名单由空变非空/由非空变空时要重估 SSE 建连（文档 §9.3）
+    // 白名单由空变非空 / 由非空变空都要重估 SSE 建连（文档 §9.3）。
+    // 同步函数、内部已兜异常，故不必 await
+    reevaluate()
     return true
   }
 
@@ -106,6 +109,8 @@ export class MaiPush extends plugin {
       `${on ? '已全局开启' : '已全局关闭'}maimai别名推送（共 ${groups.length} 个群）`,
       true,
     )
+    // 白名单整体置位后重估 SSE 建连（文档 §9.3）
+    reevaluate()
     return true
   }
 }

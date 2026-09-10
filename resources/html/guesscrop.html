@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!-- 猜曲绘裁片（P3 实施文档 §4.4）：固定尺寸容器 + 曲绘负偏移，渲染器截 #container 即得裁片。
+     不做像素运算，故无需任何图像库；窗口坐标由 lib/render/crop.js:pickCropWindow 算出。 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* 容器尺寸 = 裁片尺寸；宿主 puppeteer 截的是 #container 的 boundingBox */
+    #container {
+      position: relative;
+      width: {{w}}px;
+      height: {{h}}px;
+      overflow: hidden;
+      background: #000;
+    }
+    img { position: absolute; left: -{{x}}px; top: -{{y}}px; width: {{W}}px; height: {{H}}px; display: block; }
+  </style>
+</head>
+<body>
+<div id="container"><img src="{{src}}"></div>
+</body>
+</html>

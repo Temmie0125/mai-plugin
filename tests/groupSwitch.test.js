@@ -18,10 +18,23 @@ if (!global.logger) {
   })
 }
 
-beforeEach(() => {
+/**
+ * `push on/off` 现在会顺带重估别名推送 SSE（`lib/aliasSse.js:reevaluate`），
+ * 白名单非空时会去连柚子 —— 测试里必须打桩网络并确保连接被关掉，
+ * 否则既慢又可能真发请求。
+ */
+const realFetch = globalThis.fetch
+let sse = null
+beforeEach(async () => {
+  globalThis.fetch = async () => { throw new Error('测试不打真网络') }
+  sse = await import('../lib/aliasSse.js')
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-plugin-group-'))
   database.setDataRoot(dir)
-  return () => fs.rmSync(dir, { recursive: true, force: true })
+  return () => {
+    sse.shutdown()
+    globalThis.fetch = realFetch
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 /** 假宿主 Bot：adapterBots = Bot[uin]（实取），caches = Bot.bots[uin].gl（缓存） */

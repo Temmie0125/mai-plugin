@@ -111,6 +111,15 @@ for (const [i, file] of files.entries()) {
   }
 }
 
+// 6) 别名推送 SSE（设计 §7.2）：**数据就绪之后**才连——源在数据加载前就连，
+//    早到的事件会撞空库（登记为改进）。建连条件见 lib/aliasSse.js:shouldConnect
+try {
+  const { reevaluate } = await import('./lib/aliasSse.js')
+  reevaluate()
+} catch (error) {
+  logger.error('[mai-plugin] 别名推送启动失败：', error?.message || error)
+}
+
 logger.mark(`[mai-plugin] v${version} 载入完成 · 命令头「${Config.getUserCfg('config', 'cmdhead')}」`)
 logger.mark('[mai-plugin] 移植自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）· 上游 mai-bot')
 
