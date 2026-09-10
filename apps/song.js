@@ -377,7 +377,7 @@ export class MaiAlias extends plugin {
 
     // 动作词预留（P3 管理/投票路由，勿落到通配查询）
     if (['sync', 'local', 'apply', 'vote', 'votes'].includes(raw.split(/\s+/)[0])) {
-      await this.reply(`「${raw.split(/\\s+/)[0]}」属于别名管理指令，将在后续版本开放。`, true)
+      await this.reply(`「${raw.split(/\s+/)[0]}」属于别名管理指令，将在后续版本开放。`, true)
       return true
     }
 

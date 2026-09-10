@@ -88,6 +88,15 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 ## 开发
 
+### 调试数据安全（重要）
+
+- 任何离线脚本/调试驱动若 import `lib/database.js`，**必须**先 `setDataRoot(临时目录)`——
+  直接读写真机 `data/` 会导致用户绑定凭据被旧快照覆盖（lxns 401 刷新后的新 refresh_token
+  一旦被旧值回退即不可逆失效，服务端已轮换）。
+- `lib/database.js` 已内置三道防护：行级 read-merge-write（磁盘为全集，尊重外部新增/删除）、
+  凭据空值不回退（accessToken/refreshToken/friendCode）、写前时间戳备份轮转
+  （`user.json.<yyyymmddHHmmss>.bak`，保留最近 10 份，可用于人工回溯）。
+
 ```bash
 cd plugins/mai-plugin
 npm test                    # 纯函数单测（node --test "tests/*.test.js"）

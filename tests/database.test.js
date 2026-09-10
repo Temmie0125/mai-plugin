@@ -66,6 +66,58 @@ test('openid（官方QQBot）用户键：非数字键原样存储且不落 qqid'
   assert.equal(database.getUser(openid).accessToken, 'tok')
 })
 
+test('写盘安全：外部新写入（如真机 401 刷新）不被内存旧快照回退', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-plugin-wal-'))
+  database.setDataRoot(dir)
+  await database.load()
+  database.updateUser('1001', { service: 'lxns' }) // 内存快照：无凭据
+
+  // 模拟外部进程（或 bot 运行中的另一次写）刷新出新鲜 refresh_token
+  const file = path.join(dir, 'user.json')
+  const disk = JSON.parse(fs.readFileSync(file, 'utf8'))
+  disk.users['1001'] = { ...disk.users['1001'], accessToken: 'NEW_AT', refreshToken: 'NEW_RT', friendCode: 42 }
+  fs.writeFileSync(file, JSON.stringify(disk, null, 2))
+
+  // 旧快照此刻做一次普通写（如切换主题）——不得回退凭据
+  database.updateUser('1001', { theme: 'circle' })
+  const after = JSON.parse(fs.readFileSync(file, 'utf8')).users['1001']
+  assert.equal(after.accessToken, 'NEW_AT')
+  assert.equal(after.refreshToken, 'NEW_RT')
+  assert.equal(after.friendCode, 42)
+  assert.equal(after.theme, 'circle')
+  // 内存与磁盘同步
+  assert.equal(database.getUser('1001').refreshToken, 'NEW_RT')
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('写盘安全：空值不覆盖非空凭据；磁盘删除被尊重；备份轮转 ≤10 份', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-plugin-wal2-'))
+  database.setDataRoot(dir)
+  await database.load()
+  database.updateUser('2002', { service: 'lxns', accessToken: 'AK', refreshToken: 'RK' })
+
+  // 空值保护
+  database.updateUser('2002', { accessToken: '' })
+  assert.equal(database.getUser('2002').accessToken, 'AK')
+
+  // 磁盘删除尊重（外部删键后，写另一键不得复活已删键）
+  const file = path.join(dir, 'user.json')
+  const disk = JSON.parse(fs.readFileSync(file, 'utf8'))
+  delete disk.users['2002']
+  fs.writeFileSync(file, JSON.stringify(disk, null, 2))
+  database.updateUser('3003', { service: 'df' })
+  const users = JSON.parse(fs.readFileSync(file, 'utf8')).users
+  assert.equal(users['2002'], undefined)
+  assert.ok(users['3003'])
+
+  // 备份轮转
+  for (let i = 0; i < 12; i++) database.updateUser('3003', { theme: i % 2 ? 'circle' : 'prism_plus' })
+  const backups = fs.readdirSync(dir).filter(f => f.startsWith('user.json.') && f.endsWith('.bak'))
+  assert.ok(backups.length <= 10, `备份应轮转 ≤10，实际 ${backups.length}`)
+  assert.ok(backups.length >= 1)
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
 test('历史脏行自愈：「null」键带凭据并入唯一无凭据候选行', async () => {
   await database.load()
   const openid = '3889698912-ABCDEF0123456789'
