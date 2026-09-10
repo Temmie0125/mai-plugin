@@ -69,11 +69,14 @@ test('merge：DF id 直入 / LXNS id 分段（10000 内 SD+10000、UTAGE 保留�
     type: 'SD',
     ds: [5.0, 7.0],
     level: ['5', '7'],
+    // ⚠️ 夹具必须与真实 DF 响应同形：charts[n].notes 是**位置数组**而非对象
+    // （SD 4 项 [tap,hold,slide,brk] / DX 5 项 [tap,hold,slide,touch,brk]）。
+    // 曾经这里写成对象，照着有 bug 的实现写夹具，于是「notes 全归零」一直没被测出来。
     charts: [
-      { notes: { tap: 63, hold: 23, slide: 8, brk: 2 }, charter: '-' },
-      { notes: { tap: 60, hold: 20, slide: 10, brk: 2 }, charter: '-' },
+      { notes: [63, 23, 8, 2], charter: '-' },
+      { notes: [60, 20, 10, 2], charter: '-' },
     ],
-    basic_info: { title: 'True Love Song', artist: 'Kai', genre: '舞萌', bpm: 150, version: 'maimai', is_new: false },
+    basic_info: { title: 'True Love Song', artist: 'Kai', genre: '舞萌', bpm: 150, from: 'maimai', is_new: false },
   }]
   const lxnsList = {
     songs: [{
@@ -136,12 +139,128 @@ test('merge：LXNS utage（≥100000，BuddyNotes 拆双难度）', () => {
   assert.equal(song.difficulties[0].dx_score, 30, 'dx_score = notes.total*3')
 })
 
+test('回归：DF 位置数组 notes 必须如实落入合并库（曾全体归零）', () => {
+  // 症状：music_data.json 里 notes 正常，合并库却全是 0 —— 成因是把位置数组当对象读，
+  // `.tap/.hold/...` 全取到 undefined。这里直接断言逐项数值与 total/dx_score。
+  const dfList = [{
+    id: '8', title: 'True Love Song', type: 'SD', ds: [5.0], level: ['5'],
+    charts: [{ notes: [63, 23, 8, 2], charter: '-' }], // SD：4 项，第 4 位是 brk
+    basic_info: { title: 'True Love Song', artist: 'Kai', genre: '舞萌', bpm: 150, from: 'maimai', is_new: false },
+  }, {
+    id: '9', title: 'DX 曲', type: 'DX', ds: [7.7], level: ['7+'],
+    charts: [{ notes: [97, 11, 6, 4, 8], charter: '-' }], // DX：5 项，第 4 位是 touch、第 5 位是 brk
+    basic_info: { title: 'DX 曲', artist: 'A', genre: '舞萌', bpm: 200, from: 'maimai', is_new: false },
+  }]
+  const { list } = mergeMusicData({ divingFishList: dfList, lxnsList: null, statsMap: {} })
+
+  const sd = list.byId(8).difficulties[0]
+  assert.deepEqual(
+    { tap: sd.notes.tap, hold: sd.notes.hold, slide: sd.notes.slide, touch: sd.notes.touch, brk: sd.notes.brk },
+    { tap: 63, hold: 23, slide: 8, touch: 0, brk: 2 },
+    'SD 4 项应按 (tap,hold,slide,brk) 落位，touch 补 0',
+  )
+  assert.equal(sd.notes.total, 96, 'total 应为五项之和')
+  assert.equal(sd.dx_score, 288, 'dx_score = notes.total * 3')
+
+  const dx = list.byId(9).difficulties[0]
+  assert.deepEqual(
+    { tap: dx.notes.tap, hold: dx.notes.hold, slide: dx.notes.slide, touch: dx.notes.touch, brk: dx.notes.brk },
+    { tap: 97, hold: 11, slide: 6, touch: 4, brk: 8 },
+    'DX 5 项应按 (tap,hold,slide,touch,brk) 落位',
+  )
+  assert.equal(dx.notes.total, 126)
+
+  // 全体归零是本 bug 的签名，钉一条「非零」总闸
+  for (const s of list.root) {
+    for (const d of s.difficulties) assert.ok(d.notes.total > 0, `曲 ${s.song_id} 的 notes.total 不应为 0`)
+  }
+})
+
+test('merge：LXNS 具名 notes 对象照常解析（break 别名与自带 total）', () => {
+  // 两种来源形状不同：DF 是位置数组，LXNS 是具名对象，必须都吃
+  const lxnsList = {
+    songs: [{
+      id: 200, title: 'L', artist: 'A', genre: '舞萌', bpm: 100, version: 10000,
+      difficulties: {
+        standard: [{
+          type: 'standard', difficulty: 0, level: '5', level_value: 5.0, note_designer: '-', version: 10000,
+          notes: { total: 100, tap: 70, hold: 20, slide: 6, touch: 0, break: 4 }, // 别名 break
+        }],
+      },
+    }],
+    genres: [], versions: [{ id: 1, title: '舞萌DX', version: 10000 }],
+  }
+  const { list } = mergeMusicData({ divingFishList: null, lxnsList, statsMap: {} })
+  const d = list.byId(200).difficulties[0]
+  assert.equal(d.notes.brk, 4, 'break 别名应归一到 brk')
+  assert.equal(d.notes.total, 100, '落雪自带 total 应以其为准')
+})
+
+test('回归：DF 版本串取自 `basic_info.from`（曾读 .version 导致版本图标全坏）', () => {
+  // 症状：曲目详情卡版本分类图标的 src 变成 `pic/.png`（全部坏图）。
+  // 成因：DF 响应里的键是 `from`（源 pydantic 用 `version: str = Field(alias="from")` 映射），
+  // 端口读 `.version` 得到 undefined ⇒ version_str 空。夹具必须用真实键名。
+  const mk = (id, basic) => ({
+    id, title: 'T', type: 'SD', ds: [5.0], level: ['5'],
+    charts: [{ notes: [1, 1, 1, 1], charter: '-' }],
+    basic_info: { title: 'T', artist: 'A', genre: '舞萌', bpm: 100, is_new: false, ...basic },
+  })
+  const { list } = mergeMusicData({
+    divingFishList: [mk('8', { from: 'maimai でらっくす' }), mk('9', { version: 'maimai FiNALE' })],
+    lxnsList: null,
+    statsMap: {},
+  })
+  assert.equal(list.byId(8).version_str, 'maimai でらっくす', '真实键名是 from')
+  assert.equal(list.byId(9).version_str, 'maimai FiNALE', '保留 .version 兜底，不因上游改键而全坏')
+  for (const s of list.root) assert.ok(s.version_str, `曲 ${s.song_id} 的 version_str 不应为空`)
+})
+
+test('回归：chart_stats 的空对象条目要补默认值（否则宴谱卡显示「擬 - NaN」）', () => {
+  // 症状：宴谱卡渲染 `擬 - NaN`（views.js 直接 pyRound2(stats.fit_diff)，undefined → NaN）。
+  // 成因：chart_stats 里存在空对象 `{}`（实测本机 1420 个），源侧由 pydantic 补默认值，
+  // 端口若直接赋原值就留下一个没有 cnt/fit_diff 的空壳。
+  const dfList = [{
+    id: '8', title: 'T', type: 'SD', ds: [5.0], level: ['5'],
+    charts: [{ notes: [1, 1, 1, 1], charter: '-' }],
+    basic_info: { title: 'T', artist: 'A', genre: '舞萌', bpm: 100, from: 'maimai', is_new: false },
+  }]
+  const { list } = mergeMusicData({ divingFishList: dfList, lxnsList: null, statsMap: { 8: [{}] } })
+  const st = list.byId(8).difficulties[0].stats
+  assert.ok(st, '空对象也是 stats，不应为 null')
+  assert.equal(st.cnt, 0, '空对象应归一为默认值')
+  assert.ok(Number.isFinite(st.fit_diff), 'fit_diff 必须是有限数值，否则渲染成 NaN')
+  assert.deepEqual(st.dist, [])
+})
+
+test('基准比对：合并产物须与源侧自产的 merge_music_data.json 逐字段一致', {
+  skip: fs.existsSync(path.join(STATIC_DATA, 'merge_music_data.json'))
+    ? false
+    : '资源包缺失，跳过（resources/static/data/ 未就位）',
+}, () => {
+  // 资源包里同时有原始输入与**源侧自己产出的合并库**（NoneBot 版跑出来的），
+  // 后者即天然基准：整条合并链（notes 位序 / version 别名 / stats 归一 / id 分段）一次锁死。
+  const R = f => JSON.parse(fs.readFileSync(path.join(STATIC_DATA, f), 'utf8'))
+  const { list } = mergeMusicData({
+    divingFishList: R('music_data.json'),
+    lxnsList: R('lxns_music_data.json'),
+    statsMap: R('music_chart.json').charts,
+  })
+  const ref = R('merge_music_data.json')
+  assert.equal(list.root.length, ref.length, '曲数应与源侧一致')
+  const byId = Object.fromEntries(ref.map(s => [s.song_id, s]))
+  for (const s of list.root) {
+    const r = byId[s.song_id]
+    assert.ok(r, `源侧产物缺曲 ${s.song_id}`)
+    assert.deepEqual(s, r, `曲 ${s.song_id} 与源侧产物不一致`)
+  }
+})
+
 test('merge：DF 缺白谱由 LXNS 补挂（append_missing_difficulty 只补 Re:Master）', () => {
-  const mkChart = lv => ({ notes: { tap: 10, hold: 0, slide: 0, brk: 0 }, charter: '-' })
+  const mkChart = lv => ({ notes: [10, 0, 0, 0], charter: '-' })
   const dfList = [{
     id: '100', title: 'T', type: 'SD', ds: [3.0, 4.0, 5.0, 6.0], level: ['3', '4', '5', '6'],
     charts: [mkChart(), mkChart(), mkChart(), mkChart()],
-    basic_info: { title: 'T', artist: 'A', genre: '舞萌', bpm: 100, version: 'maimai', is_new: false },
+    basic_info: { title: 'T', artist: 'A', genre: '舞萌', bpm: 100, from: 'maimai', is_new: false },
   }]
   const mkDiff = (difficulty, level, lv) => ({ type: 'standard', difficulty, level, level_value: lv, note_designer: '-', version: 10000, notes: { total: 10, tap: 10, hold: 0, slide: 0, touch: 0, brk: 0 } })
   const lxnsList = {
