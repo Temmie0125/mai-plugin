@@ -39,7 +39,7 @@ lxnsBindPrivateOnly: false
 
 # ===== 渲染 =====
 # 截图 jpeg 质量（0-100）
-renderQuality: 92
+renderQuality: 100
 # 截图超时（毫秒）
 renderTimeout: 20000
 
