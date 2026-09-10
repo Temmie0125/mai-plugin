@@ -46,10 +46,12 @@ const REG_PLATE_INFO = () => new RegExp(`^[#/]${H()}\\s*(?:plateinfo|牌子条�
  * ⚠️ 目标集合必须照抄源 `(?:a+|b+|c|d|s+|ap|fc|fs|fdx)\+?` —— 其中 `a+`/`b+`/`s+` 是
  * **量词**（一个或多个 a/b/s），不是字面量 `a\+`；写成后者会让 'bb'/'sss' 这类目标全部失配。
  * 类别限汉字，避免把尾部页码吃进类别组。
+ * ⚠️ 源 LEVEL_PATTERN 带 re.IGNORECASE，但宿主 loader 以 `new RegExp(reg)` 编译 rule
+ * （flags 无法经 .source 传递），故大小写折叠必须显式写进字符类（[aA]+ 等），勿用 'i' 标志。
  */
 const REG_PROGRESS = () => new RegExp(
   `^[#/]${H()}\\s*(?:progress|进度查询)`
-  + `(?:\\s+([0-9]+\\+?))?(?:\\s+((?:a+|b+|c|d|s+|ap|fc|fs|fdx)\\+?))?`
+  + `(?:\\s+([0-9]+\\+?))?(?:\\s+((?:[aA]+|[bB]+|[cC]|[dD]|[sS]+|[aA][pP]|[fF][cC]|[fF][sS]|[fF][dD][xX])\\+?))?`
   + `(?:\\s+([\\u4e00-\\u9fa5]+))?(?:\\s+(\\d+))?\\s*$`
 )
 
