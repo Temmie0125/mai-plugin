@@ -11,7 +11,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import Config, { head } from '../lib/config.js'
 import * as database from '../lib/database.js'
-import { getUserAndAuth } from '../lib/user.js'
+import { getUserAndAuth, effectiveService } from '../lib/user.js'
 import { bindLxns, bindDivingfish, DF_QQ_HINT } from '../lib/handler.js'
 import { botName } from '../lib/render/picmodle.js'
 import {
@@ -29,6 +29,7 @@ const H = () => head()
 const REG_BIND_LXNS = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`)
 const REG_BIND_DF = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`)
 const REG_BIND_QQ = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`)
+const REG_UNBIND = () => new RegExp(`^[#/]${H()}\\s*(?:unbind|解绑)(?:\\s+(\\S+))?$`)
 const REG_SOURCE = () => new RegExp(`^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`)
 const REG_THEME = () => new RegExp(`^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`)
 
@@ -110,6 +111,13 @@ const BIND_QQ_HELP = [
   '   仅写入本插件本地数据（data/user.json），用于水鱼授权与查询。',
 ].join('\n')
 
+const UNBIND_HELP = [
+  '用法：#mai unbind <lxns|df|qq>（别名：解绑）',
+  '・lxns/落雪：清除本地落雪凭据与好友码；指针在落雪时自动切回水鱼',
+  '・df/水鱼：清本地令牌缓存并提供服务端撤销页（水鱼凭据不落 BOT）',
+  '・qq：解除「bind qq」补充的游戏 QQ（官方QQBot 水鱼将重新受限）',
+].join('\n')
+
 function divingfishAuthorizeMsg(cfg, authorization) {
   return [
     '请完成水鱼查分器授权：',
@@ -147,6 +155,7 @@ export class MaiBind extends plugin {
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`, fnc: 'bindLxnsCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`, fnc: 'bindDfCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`, fnc: 'bindQqCmd' },
+        { reg: `^[#/]${H()}\\s*(?:unbind|解绑)(?:\\s+(\\S+))?$`, fnc: 'unbindCmd' },
         { reg: `^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`, fnc: 'switchSource' },
         { reg: `^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`, fnc: 'switchTheme' },
       ],
@@ -263,6 +272,66 @@ export class MaiBind extends plugin {
       await this.reply(classifyBindError(error), true)
       this.setContext('waitLxnsCode', false, 600, LXNS_TIMEOUT_MSG())
     }
+    return true
+  }
+
+  /**
+   * #mai unbind <lxns|df|qq>：解除对应绑定（绑定闭环收口）
+   * - lxns：清空本地凭据与好友码；若数据源指针在落雪 → 自动切回水鱼（否则指针停在空源）
+   * - df  ：本地无凭据可清（服务端 on-behalf）；清 5 分钟 TokenCache，给出水鱼撤销页，
+   *          指针在水鱼且已绑落雪时自动切落雪
+   * - qq  ：清除补充的游戏 QQ（官方QQBot 水鱼将重新受限）
+   */
+  async unbindCmd(e) {
+    const args = ((e.msg.match(REG_UNBIND()) || [])[1] || '').trim().toLowerCase()
+    const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
+    if (!got) return true
+    const { user } = got
+    const cfg = Config.getUserCfg('config')
+
+    if (!args || !['lxns', '落雪', 'df', '水鱼', 'qq'].includes(args)) {
+      await this.reply(UNBIND_HELP, true)
+      return true
+    }
+
+    if (args === 'lxns' || args === '落雪') {
+      const hadCreds = Boolean(user.accessToken || user.refreshToken || user.friendCode)
+      database.clearUserFields(user.key, ['accessToken', 'refreshToken', 'friendCode'])
+      let tail = hadCreds ? '本地凭据与好友码已清除。' : '本地未发现落雪凭据（可能尚未绑定）。'
+      if (effectiveService(database.getUser(user.key)) === 'lxns') {
+        database.updateUser(user.key, { service: 'df' })
+        tail += '\n数据源指针原在落雪，已自动切回水鱼。'
+      }
+      await this.reply(
+        `已解除落雪绑定（${tail}）\n※ 如需彻底撤销授权，请前往落雪站点「授权管理」取消本应用。`,
+        true,
+      )
+      return true
+    }
+
+    if (args === 'df' || args === '水鱼') {
+      // 服务端 on-behalf：本地无凭据；清进程内令牌缓存并给出撤销页
+      try {
+        const { tokens, subjectRef } = await import('../lib/client/divingfishOauth.js')
+        if (Number.isInteger(user.qqid) && user.qqid > 0) tokens.discard(subjectRef(user.qqid))
+      } catch { /* 缓存清理失败不影响解绑语义 */ }
+      let tail = ''
+      if (effectiveService(user) === 'df' && (user.accessToken || user.refreshToken)) {
+        database.updateUser(user.key, { service: 'lxns' })
+        tail = '\n数据源指针原在水鱼，已自动切换为落雪。'
+      }
+      const revoke = `${(cfg.dfAuthUrl || 'https://auth.diving-fish.com').replace(/\/+$/, '')}${REVOKE_URL}`
+      await this.reply(
+        '已解除水鱼绑定（本地令牌缓存已清除；水鱼凭据仅存于服务端，无需本地清除）。\n' +
+        `※ 彻底撤销授权请前往：${revoke}${tail}`,
+        true,
+      )
+      return true
+    }
+
+    // qq：清除补充的游戏 QQ
+    database.updateUser(user.key, { qqid: null })
+    await this.reply('已解除游戏 QQ 绑定，水鱼查分器将恢复受限（可随时「#mai bind qq」重新补充）。', true)
     return true
   }
 

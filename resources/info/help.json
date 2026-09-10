@@ -113,6 +113,11 @@
         "desc": "（官方QQBot）补充游戏 QQ 以解锁水鱼查分器；clear 解除"
       },
       {
+        "title": "unbind <lxns|df|qq>",
+        "eg": "#{head} unbind lxns",
+        "desc": "解除对应绑定（落雪凭据/水鱼撤销页/补充QQ）"
+      },
+      {
         "title": "source <数据源>",
         "eg": "#{head} source 1",
         "desc": "切换数据源（0=水鱼, 1=落雪；绑定落雪会自动切换）"

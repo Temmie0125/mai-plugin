@@ -157,6 +157,68 @@ test('migrate-userdb：导入映射 + 幂等 + 只补空字段', async () => {
   rmSync(dir, { recursive: true, force: true })
 })
 
+// ---- unbind：绑定闭环（lxns 清凭据+切源 / df 撤销页+切源 / qq 清除 / 帮助）----
+test('unbind 规则：命中与拒收', async () => {
+  const { MaiBind } = await import('../apps/bind.js')
+  const rules = new MaiBind().rule.map(r => ({ reg: new RegExp(r.reg), fnc: r.fnc }))
+  const hit = msg => rules.filter(r => r.reg.test(msg)).map(r => r.fnc)
+  for (const msg of ['#mai unbind lxns', '#mai unbind df', '#mai unbind qq', '#mai解绑 落雪', '#mai unbind']) {
+    assert.deepEqual(hit(msg), ['unbindCmd'], `应命中 unbindCmd：${msg}`)
+  }
+  for (const msg of ['#mai unbound', '#mai unbindx 1', '#mai unbind lxns extra', 'unbind lxns']) {
+    assert.equal(hit(msg).length, 0, `不应命中：${msg}`)
+  }
+})
+
+test('unbind 行为：lxns 清凭据并切回水鱼；df 给出撤销页并切落雪；qq 清除', async () => {
+  const database = await import('../lib/database.js')
+  const { MaiBind } = await import('../apps/bind.js')
+  const dir = mkdtempSync(path.join(tmpdir(), 'mai-unbind-'))
+  database.setDataRoot(dir)
+  await database.load()
+  const openid = 'OPENID-UNBIND-1'
+  const mkE = (msg, uid = openid) => ({ msg, message: [], user_id: uid, isGroup: false, isPrivate: true, reply: async () => {} })
+  const inst = new MaiBind()
+  const replies = []
+  inst.reply = async m => replies.push(typeof m === 'string' ? m : '…')
+
+  // lxns：有凭据 + 指针在落雪 → 清空 + 切回 df
+  database.updateUser(openid, {
+    service: 'lxns', accessToken: 'AK', refreshToken: 'RK', friendCode: 123, qqid: 114514,
+  })
+  await inst.unbindCmd(mkE('#mai unbind lxns'))
+  let row = database.getUser(openid)
+  assert.equal(row.accessToken, undefined)
+  assert.equal(row.refreshToken, undefined)
+  assert.equal(row.friendCode, undefined)
+  assert.equal(row.service, 'df')
+  assert.match(replies.join('\n'), /已解除落雪绑定/)
+  assert.match(replies.join('\n'), /自动切回水鱼/)
+  await database.load()
+  assert.equal(database.getUser(openid).accessToken, undefined, '磁盘同步清除')
+
+  // df：指针在水鱼且已持落雪凭据 → 自动切落雪 + 撤销页链接
+  replies.length = 0
+  database.updateUser(openid, { service: 'df', accessToken: 'AK2', refreshToken: 'RK2' })
+  await inst.unbindCmd(mkE('#mai unbind df'))
+  row = database.getUser(openid)
+  assert.equal(row.service, 'lxns')
+  assert.equal(row.accessToken, 'AK2', 'df 解绑不得动落雪凭据')
+  assert.match(replies.join('\n'), /auth\.diving-fish\.com\/apps/)
+
+  // qq：清除补充的游戏 QQ
+  replies.length = 0
+  await inst.unbindCmd(mkE('#mai unbind qq'))
+  assert.equal(database.getUser(openid).qqid, undefined)
+  assert.match(replies.join('\n'), /已解除游戏 QQ 绑定/)
+
+  // 未知平台 → 帮助
+  replies.length = 0
+  await inst.unbindCmd(mkE('#mai unbind 不存在'))
+  assert.match(replies.join('\n'), /用法：#mai unbind/)
+  rmSync(dir, { recursive: true, force: true })
+})
+
 // ---- effectiveService：service 缺失兜底（历史写入丢失场景）----
 test('user.effectiveService：显式值优先 / 凭据兜底 / 缺省 df', async () => {
   const { effectiveService } = await import('../lib/user.js')

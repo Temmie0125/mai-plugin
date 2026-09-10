@@ -18,7 +18,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai b50 / ap50 / score <曲名> / ginfo / song <曲名|ID> / search <关键词> / what <词>
 #   检索语法：search 定数14+ / 定数14-15 / bpm200-300（区间用 - 或 ~，尾部数字为页码）
 #mai table <定数> / plate <条件或版本称号> / progress / list
-#mai bind lxns|df / source / theme
+#mai bind lxns|df|qq / unbind <lxns|df|qq> / source / theme
 #mai guess / guessill / fortune / rand / rise
 #mai alias … / push on|off / sync
 #mai 更新 / 强制更新（仅主人）
