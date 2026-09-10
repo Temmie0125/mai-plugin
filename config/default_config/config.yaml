@@ -55,6 +55,29 @@ helpMaxRows: 60
 # 分页大小（多候选选曲、投票列表等）
 pageSize: 10
 
+# ===== 猜歌 =====
+# 每轮特征提示的间隔（秒）
+# ⚠️ 默认 15 而非源的 8：QQ 群消息与官方 QQBot 被动回复均限每分钟 5 条，
+#    8 秒间隔会让一局在任一 60 秒窗口内发出 7 条（0/4/12/20/28/36/44/52），必然撞限。
+#    15 秒恰好把峰值压到 4 条/分。确有富余可调小，但下限 8 秒。
+guessRoundInterval: 15
+# 最后一轮之后等待多久揭晓答案（秒；源为 30）
+guessRevealTimeout: 30
+
+# ===== 开字母 =====
+# 每局抽取的曲目数（默认 8，同 phi-plugin 的 LetterNum）
+letterSongCount: 8
+# 开字母冷却（秒，0 = 不限；同 phi 的 LetterRevealCd）
+letterRevealCd: 0
+# 猜题冷却（秒，0 = 不限；同 phi 的 LetterGuessCd）
+letterGuessCd: 0
+# 随机提示冷却（秒，0 = 不限；同 phi 的 LetterTipCd）
+# 用「#mai tips」随机翻开一个字符，受这条约束（与上面的开字母冷却分开计）
+letterTipCd: 0
+# 多久没有**新的答对**就自动揭晓收尾（秒，默认 300）
+# 注意判据是「距上次答对」而非「距开局」——有人答对就重置计时
+letterIdleTimeout: 300
+
 # ===== 定时 =====
 # 每日自动同步曲库/别名/牌子（改动需重启生效）
 # 关闭后仍可随时由主人执行「#mai sync」手动同步

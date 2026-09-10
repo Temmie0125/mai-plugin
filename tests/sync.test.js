@@ -4,9 +4,21 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { readJson, writeJsonAtomic } from '../lib/jsonFile.js'
-import { mai } from '../lib/service.js'
-import { syncMusicData, isSyncing } from '../lib/sync.js'
+// 宿主全局 logger 打桩：`syncMusicData` 现在会顺带重建猜歌池（lib/guess.js），
+// 而 lib 模块的 `global.logger || console` 回退在 console 上没有 .mark 会抛
+if (!global.logger) {
+  const base = console.log.bind(console)
+  global.logger = new Proxy(base, {
+    get(t, p) {
+      if (p in console) return console[p].bind(console)
+      return (...a) => a.join(' ')
+    },
+  })
+}
+
+const { readJson, writeJsonAtomic } = await import('../lib/jsonFile.js')
+const { mai } = await import('../lib/service.js')
+const { syncMusicData, isSyncing } = await import('../lib/sync.js')
 
 test('writeJsonAtomic：先写 .tmp 再 rename，成功后不残留临时文件', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-json-'))

@@ -56,7 +56,7 @@ const SONGS = [
 ]
 
 let root
-beforeEach(() => {
+beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-alias-'))
   service.setDataRoot(root)
   // ⚠️ 两个模块各有独立的 dataRoot，**必须都注入**：
@@ -64,6 +64,8 @@ beforeEach(() => {
   //    database → 用户表（`voteAlias`/`applyAlias` 走 getUserAndAuth + autoCreate，
   //               漏注入会以测试 user_id 往真机 data/user.json 里建行——已踩过一次）
   database.setDataRoot(root)
+  // setDataRoot 只换目录、不清内存态（userDb/groupDb），再 load 一次从空临时目录重建
+  await database.load()
   fs.mkdirSync(path.join(root, 'music'), { recursive: true })
   fs.writeFileSync(path.join(root, 'music', 'music_alias.json'), JSON.stringify(YUZU))
   // 内存态：曲库 + 别名（等价于 load 完成后的样子）

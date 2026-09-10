@@ -17,6 +17,7 @@ import Config from './lib/config.js'
 import * as database from './lib/database.js'
 import { checkReadiness } from './lib/render/assets.js'
 import { resolveAutoSyncCron } from './lib/schedule.js'
+import { rebuildGuessPool } from './lib/guess.js'
 import { mai } from './lib/service.js'
 import pkg from './package.json' with { type: 'json' }
 const { version } = pkg
@@ -35,6 +36,9 @@ try {
 } catch (error) {
   logger.error('[mai-plugin] 曲库初始化异常：', error?.message || error)
 }
+
+// 3.1) 猜歌曲子池（源 __init__.py:59 在数据加载后构建一次；此后每次同步由 lib/sync.js 重建）
+if (mai.ready) rebuildGuessPool()
 
 logger.mark('-------mai-plugin-------')
 

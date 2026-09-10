@@ -130,17 +130,37 @@
       {
         "title": "guess",
         "eg": "#{head} guess",
-        "desc": "猜歌游戏"
+        "desc": "猜歌游戏（7 轮特征提示；进行中直接发歌名/别名/id 作答，无需命令头）"
       },
       {
         "title": "guessill",
         "eg": "#{head} guessill",
-        "desc": "猜曲绘游戏"
+        "desc": "猜曲绘游戏（30 秒内答出裁切曲绘所属曲目）"
       },
       {
         "title": "guess on|off / reset",
         "eg": "#{head} guess on",
-        "desc": "开启/关闭/重置猜歌（群管）"
+        "desc": "开启/关闭/重置猜歌（群管，对三类游戏统一生效）"
+      },
+      {
+        "title": "letter / 开字母",
+        "eg": "#{head} letter",
+        "desc": "开字母游戏（曲名遮成 *；直接发曲名/别名作答）"
+      },
+      {
+        "title": "open <字母>",
+        "eg": "#open J",
+        "desc": "翻开字母（汉字按拼音、假名按罗马字，如 J 开「今」与「ジ」）"
+      },
+      {
+        "title": "tips / 提示",
+        "eg": "#{head} tips",
+        "desc": "开字母：随机翻开一个字符（受「随机提示冷却」约束）"
+      },
+      {
+        "title": "ans / 答案",
+        "eg": "#{head} ans",
+        "desc": "提前结束当前游戏并揭晓（群管或本局发起者）"
       },
       {
         "title": "fortune / jrrp / 今日舞萌",
