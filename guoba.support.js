@@ -17,9 +17,9 @@ export function supportGuoba() {
     pluginInfo: {
       name: 'mai-plugin',
       title: 'mai-plugin',
-      author: 'mai-plugin contributors',
-      authorLink: 'https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx',
-      link: 'https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx',
+      author: '@Temmie0125',
+      authorLink: 'https://github.com/Temmie0125',
+      link: 'https://github.com/Temmie0125/mai-plugin',
       isV3: true,
       isV2: false,
       description: '舞萌DX 查询插件（移植自 nonebot-plugin-maimaidx）',
