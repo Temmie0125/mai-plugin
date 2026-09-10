@@ -52,14 +52,17 @@ test('常量表派生（RANK_MAP/COMBO_MAP/SYNC_MAP 与源一致）', () => {
   assert.equal(DX_CN_VERSION['舞萌DX 2026'][1], 'maimai でらっくす PRiSM PLUS')
 })
 
-test('qqhash 与 Python 实现一致（样例锁值）', () => {
-  // Python: days=(d+31*m+77); (days*qq)>>8 —— 用固定日期语义直接验证 BigInt 路径
-  const qq = 1145141919
-  const days = 9 + 31 * 9 + 77 // 2026-09-09
-  assert.equal(qqhash(114514), Number((BigInt(days) * 114514n) >> 8n))
+test('qqhash 与 Python 实现一致（固定日期锁值）', () => {
+  // Python: days=(d+31*m+77); (days*qq)>>8 —— 日期注入口固定 2026-09-09，跨天不失效
+  const fixed = new Date(2026, 8, 9)
+  const days = 9 + 31 * 9 + 77
+  assert.equal(qqhash(114514, fixed), Number((BigInt(days) * 114514n) >> 8n))
   // 大数不丢精度
-  const big = (BigInt(days) * BigInt(qq)) >> 8n
+  const big = (BigInt(days) * BigInt(1145141919)) >> 8n
   assert.ok(big < 2n ** 53n)
+  // 同日恒定、异日变化（源「同人同签、日变」语义）
+  assert.equal(qqhash(114514, fixed), qqhash(114514, new Date(2026, 8, 9, 23, 59)))
+  assert.notEqual(qqhash(114514, fixed), qqhash(114514, new Date(2026, 8, 10)))
 })
 
 test('半角宽度度量（源 coloum_width 表）', () => {

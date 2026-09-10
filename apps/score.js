@@ -14,9 +14,9 @@ import { awaitPickSong, handlePickSong, findSongCandidates } from '../lib/pickSo
 
 const H = () => head()
 
-const REG_B50 = () => new RegExp(`^[#/]${H()}\\s+(?:b50|B50)\\s*(.*)$`)
-const REG_AP50 = () => new RegExp(`^[#/]${H()}\\s+(?:ap50|AP50)\\s*(.*)$`)
-const REG_SCORE = () => new RegExp(`^[#/]${H()}\\s+(?:score|info|minfo|单曲成绩)\\s+(.+)$`)
+const REG_B50 = () => new RegExp(`^[#/]${H()}\\s*(?:b50|B50)\\s*(.*)$`)
+const REG_AP50 = () => new RegExp(`^[#/]${H()}\\s*(?:ap50|AP50)\\s*(.*)$`)
+const REG_SCORE = () => new RegExp(`^[#/]${H()}\\s*(?:score|info|minfo|单曲成绩)(?:\\s+(.+))?$`)
 
 export class MaiScore extends plugin {
   constructor() {
@@ -26,9 +26,9 @@ export class MaiScore extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s+(?:b50|B50)\\s*(.*)$`, fnc: 'best50' },
-        { reg: `^[#/]${H()}\\s+(?:ap50|AP50)\\s*(.*)$`, fnc: 'ap50' },
-        { reg: `^[#/]${H()}\\s+(?:score|info|minfo|单曲成绩)\\s+(.+)$`, fnc: 'playData' },
+        { reg: `^[#/]${H()}\\s*(?:b50|B50)\\s*(.*)$`, fnc: 'best50' },
+        { reg: `^[#/]${H()}\\s*(?:ap50|AP50)\\s*(.*)$`, fnc: 'ap50' },
+        { reg: `^[#/]${H()}\\s*(?:score|info|minfo|单曲成绩)(?:\\s+(.+))?$`, fnc: 'playData' },
       ],
     })
   }
@@ -65,7 +65,8 @@ export class MaiScore extends plugin {
     if (!(await ensureReady(e))) return true
     let arg = (e.msg.match(REG_SCORE()) || [])[1] || ''
     arg = arg.trim()
-    // 帮助文案中的可选难度色参数：与 ginfo 语法对齐，尾部色字仅参与剥离（源 info 无按色过滤）
+    // 兼容容错：旧输入习惯可能带尾部难度色（如「score 茄子 紫」）——成绩卡含全难度，
+    // 难度参数无意义（帮助已不宣传），此处仅剥离不报错
     const colorMatch = arg.match(/^.*?[\s]+[绿黄红紫白]$/)
     if (colorMatch) arg = arg.replace(/[\s]+[绿黄红紫白]$/, '').trim()
 

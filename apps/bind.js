@@ -26,10 +26,10 @@ import {
 
 const H = () => head()
 
-const REG_BIND_LXNS = () => new RegExp(`^[#/]${H()}\\s+(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`)
-const REG_BIND_DF = () => new RegExp(`^[#/]${H()}\\s+(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`)
-const REG_SOURCE = () => new RegExp(`^[#/]${H()}\\s+(?:source|数据源)(?:\\s+(\\S+))?$`)
-const REG_THEME = () => new RegExp(`^[#/]${H()}\\s+(?:theme|主题)(?:\\s+(\\S+))?$`)
+const REG_BIND_LXNS = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`)
+const REG_BIND_DF = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`)
+const REG_SOURCE = () => new RegExp(`^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`)
+const REG_THEME = () => new RegExp(`^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`)
 
 const logger = global.logger || console
 
@@ -137,10 +137,10 @@ export class MaiBind extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s+(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`, fnc: 'bindLxnsCmd' },
-        { reg: `^[#/]${H()}\\s+(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`, fnc: 'bindDfCmd' },
-        { reg: `^[#/]${H()}\\s+(?:source|数据源)(?:\\s+(\\S+))?$`, fnc: 'switchSource' },
-        { reg: `^[#/]${H()}\\s+(?:theme|主题)(?:\\s+(\\S+))?$`, fnc: 'switchTheme' },
+        { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`, fnc: 'bindLxnsCmd' },
+        { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`, fnc: 'bindDfCmd' },
+        { reg: `^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`, fnc: 'switchSource' },
+        { reg: `^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`, fnc: 'switchTheme' },
       ],
     })
   }

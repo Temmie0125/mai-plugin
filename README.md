@@ -15,7 +15,8 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 指令前缀 `#` 或 `/` 均可触发；命令头默认 `mai`，可在配置中修改。发送 `#mai help` 查看完整帮助图。
 
 ```
-#mai b50 / ap50 / score <曲名> / ginfo / song <关键词> / what <词>
+#mai b50 / ap50 / score <曲名> / ginfo / song <曲名|ID> / search <关键词> / what <词>
+#   检索语法：search 定数14+ / 定数14-15 / bpm200-300（区间用 - 或 ~，尾部数字为页码）
 #mai table <定数> / plate <条件或版本称号> / progress / list
 #mai bind lxns|df / source / theme
 #mai guess / guessill / fortune / rand / rise
@@ -25,7 +26,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 
 口语指令（无需前缀）保留：`来首紫14`、`XX是什么歌`、`我要上20分`、`XX有什么别名` 等。
 
-> 相比原插件的行为变化：查歌族统一收编为 `#mai <子命令>`；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；`update` 一词刻意避开，数据同步用 `#mai sync`。
+> 相比原插件的行为变化：查歌族统一收编为 `#mai <子命令>`（`song` 精确出详情卡，`search` 检索出列表——对齐 phi-plugin 的 search 心智）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；`update` 一词刻意避开，数据同步用 `#mai sync`。
 
 ## 安装与资源
 

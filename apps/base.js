@@ -20,7 +20,7 @@ export class MaiBase extends plugin {
       priority: 100,
       rule: [
         // 裸 #mai / #mai help / #mai 帮助 / #mai 菜单
-        { reg: `^[#/]${H()}(\\s+(help|帮助|菜单|maihelp|mai\\s*help))?\\s*$`, fnc: 'help' },
+        { reg: `^[#/]${H()}(\\s*(help|帮助|菜单|maihelp|mai\\s*help))?\\s*$`, fnc: 'help' },
       ],
     })
   }

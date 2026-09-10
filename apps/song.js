@@ -1,7 +1,12 @@
 /**
- * #mai song 查歌族 + 什么歌反查（源 commands/mai_search.py，设计 §3.2-20/21/22）
+ * #mai song / search 查歌族 + 什么歌反查（源 commands/mai_search.py，设计 §3.2-20/21/22）
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
- * - song：<关键词>（曲名）/ 定数|bpm|曲师|谱师 前缀过滤；1→谱面卡，≤5→文本，>5→分页列表图
+ * - song：精确直查 → 曲目详情卡（1 命中）；多条结果自动降级为列表（≤5 文本 / >5 分页图）
+ * - search：检索列表语义（对齐 phi-plugin `#phi search` 心智）——跳过详情卡分支，一律列表
+ *   两者共享 parseSongQuery：曲名/别名/ID + 定数|bpm|曲师|谱师 前缀过滤
+ *   数值语法：`定数14`/`定数14.5`、等级字面 `定数14+`（游戏内 14.6+ 显示「14+」）、
+ *   区间必须显式连接符 `定数14-15`/`定数14~15`（含全角 ～/－）、尾部数字为页码；
+ *   无连接符的双数字 = 单值 + 页码（如 `定数14 4`，防区间误判）；bpm 语法同构
  * - what / 「XX是什么歌」：本地别名 → 柚子投票态 → id → 标题链（口语正则保留，priority 1500）
  */
 import plugin from '../../../lib/plugins/plugin.js'
@@ -15,22 +20,29 @@ import { awaitPickSong, handlePickSong } from '../lib/pickSong.js'
 
 const H = () => head()
 
-const REG_SONG = () => new RegExp(`^[#/]${H()}\\s+(?:song|查歌)\\s+(.+)$`)
-const REG_WHAT = () => new RegExp(`^[#/]${H()}\\s+what\\s+(.+)$`)
-const REG_ALIAS = () => new RegExp(`^[#/]${H()}\\s+alias(?:\\s+(.+))?$`)
+const REG_SONG = () => new RegExp(`^[#/]${H()}\\s*(?:song|查歌)(?:\\s+(.+))?$`)
+const REG_SEARCH = () => new RegExp(`^[#/]${H()}\\s*(?:search|检索|搜索)(?:\\s+(.+))?$`)
+const REG_WHAT = () => new RegExp(`^[#/]${H()}\\s*what\\s+(.+)$`)
+const REG_ALIAS = () => new RegExp(`^[#/]${H()}\\s*alias(?:\\s+(.+))?$`)
 const REG_WHAT_SAY = () => new RegExp(`^(.+)是(什么|啥)歌[？?]?([0-9]+)?$`)
 
 const isFloat = v => !Number.isNaN(parseFloat(v))
 
-/** 查歌参数解析（源 depend.py process_regex 直译；返回 null 表示参数错误需回复 msg） */
+/**
+ * 查歌参数解析（源 depend.py process_regex 语义 + 收编后的粘连前缀扩展）
+ * - 源触发形态「定数14查歌」中前缀紧贴触发词；收编为子命令后支持 `#mai song 定数14`
+ *   与 `#mai song 定数 14` 两种写法（前缀后空格可选）
+ */
 export function parseSongQuery(rawArgs) {
-  const tokens = rawArgs.split(/\s+/).filter(Boolean)
-  const first = tokens[0]
-  const rest = tokens.slice(1)
+  const raw = String(rawArgs).trim()
+  const lead = raw.match(/^(定数|bpm|曲师|谱师)\s*(.+)$/i)
+  const tokens = raw.split(/\s+/).filter(Boolean)
 
   let cmd = null
-  if (['定数', 'bpm', '曲师', '谱师'].includes(first)) {
-    cmd = first
+  let rest = []
+  if (lead) {
+    cmd = lead[1].toLowerCase() === 'bpm' ? 'bpm' : lead[1]
+    rest = lead[2].split(/\s+/).filter(Boolean)
   }
 
   let page = 1
@@ -45,7 +57,7 @@ export function parseSongQuery(rawArgs) {
     if (idOnly || idPrefixed) {
       const num = parseInt(idOnly ? list.join('') : list[1], 10)
       const song = mai.totalList.byId(num)
-      return { result: song ? [song] : [] }
+      return { result: song ? [song] : [], page, source: 'id' }
     }
     // 整词别名精确命中 → 直出（源别名仅在「什么歌」通道；此处为查歌族友好化扩展，
     // 仅当标题过滤 0 命中时兜底判断，避免别名歧义干扰正常标题搜索）
@@ -55,7 +67,7 @@ export function parseSongQuery(rawArgs) {
         const songs = aliasSongs
           .map(a => mai.totalList.byId(a.song_id))
           .filter(Boolean)
-        return { result: songs }
+        return { result: songs, page, source: 'alias' }
       }
     }
     // 末尾纯数字视为页数，其余整体作为标题（支持含空格的标题）
@@ -66,57 +78,61 @@ export function parseSongQuery(rawArgs) {
     } else {
       title = list.join(' ')
     }
-    return { result: mai.totalList.filter({ title }) }
+    return { result: mai.totalList.filter({ title }), page, source: 'title' }
   }
 
+  // 定数 / bpm：区间必须显式连接符（- 或 ~，含全角 ～/－）；无连接符双数字 = 单值 + 页码
   if (cmd === '定数') {
-    let ds1
-    let ds2
-    if (rest.length === 1 && isFloat(rest[0])) {
-      ;[ds1, ds2] = [parseFloat(rest[0]), parseFloat(rest[0])]
-    } else if (rest.length === 2 && isFloat(rest[0]) && isFloat(rest[1])) {
-      ;[ds1, ds2] = [parseFloat(rest[0]), parseFloat(rest[1])]
-    } else if (rest.length === 3 && isFloat(rest[0]) && isFloat(rest[1]) && /^\d+$/.test(rest[2])) {
-      ;[ds1, ds2, page] = [parseFloat(rest[0]), parseFloat(rest[1]), parseInt(rest[2], 10)]
-    } else {
-      return {
-        error: [
-          '定数查歌参数错误，请输入正确格式，页数为可选：',
-          '定数查歌「定数」「页数」',
-          '定数查歌「最小定数」「最大定数」「页数」',
-          '',
-        ].join('\n'),
-      }
+    const s = rest.join(' ')
+    // 定数+（游戏内 14.6+ 显示为「14+」，按等级字面过滤）
+    const plus = s.match(/^(\d+)\+(?:\s+(\d+))?$/)
+    if (plus) {
+      if (plus[2]) page = parseInt(plus[2], 10)
+      return { result: mai.totalList.filter({ level: [`${plus[1]}+`] }), page, source: 'filter' }
     }
-    return { result: mai.totalList.filter({ level_value: [ds1, ds2] }) }
+    const range = s.match(/^(\d+(?:\.\d+)?)\s*[-~～－]\s*(\d+(?:\.\d+)?)(?:\s+(\d+))?$/)
+    if (range) {
+      const [a, b] = [parseFloat(range[1]), parseFloat(range[2])].sort((x, y) => x - y)
+      if (range[3]) page = parseInt(range[3], 10)
+      return { result: mai.totalList.filter({ level_value: [a, b] }), page, source: 'filter' }
+    }
+    const single = s.match(/^(\d+(?:\.\d+)?)(?:\s+(\d+))?$/)
+    if (single) {
+      if (single[2]) page = parseInt(single[2], 10)
+      const v = parseFloat(single[1])
+      return { result: mai.totalList.filter({ level_value: [v, v] }), page, source: 'filter' }
+    }
+    return {
+      error: [
+        '定数查歌参数错误，页数为可选：',
+        '定数查歌「定数或定数+」「页数」（如 定数14、定数14+、定数14 3）',
+        '定数查歌「最小定数-最大定数」「页数」（连接符 - 或 ~，如 定数14-15、定数14.5~15 2）',
+        '',
+      ].join('\n'),
+    }
   }
 
   if (cmd === 'bpm') {
-    let result
-    if (rest.length === 1 && isFloat(rest[0])) {
-      result = mai.totalList.filter({ bpm: parseFloat(rest[0]) })
-    } else if (rest.length === 2 && isFloat(rest[0]) && isFloat(rest[1])) {
-      const [b1, b2] = [parseFloat(rest[0]), parseFloat(rest[1])]
-      if (b1 > b2) {
-        page = Math.trunc(b2)
-        result = mai.totalList.filter({ bpm: b1 })
-      } else {
-        result = mai.totalList.filter({ bpm: [b1, b2] })
-      }
-    } else if (rest.length === 3 && isFloat(rest[0]) && isFloat(rest[1]) && /^\d+$/.test(rest[2])) {
-      result = mai.totalList.filter({ bpm: [parseFloat(rest[0]), parseFloat(rest[1])] })
-      page = parseInt(rest[2], 10)
-    } else {
-      return {
-        error: [
-          'bpm查歌参数错误，请输入正确格式，页数为可选：',
-          'bpm查歌「bpm」「页数」',
-          'bpm查歌「最小bpm」「最大bpm」「页数」',
-          '',
-        ].join('\n'),
-      }
+    const s = rest.join(' ')
+    const range = s.match(/^(\d+(?:\.\d+)?)\s*[-~～－]\s*(\d+(?:\.\d+)?)(?:\s+(\d+))?$/)
+    if (range) {
+      const [a, b] = [parseFloat(range[1]), parseFloat(range[2])].sort((x, y) => x - y)
+      if (range[3]) page = parseInt(range[3], 10)
+      return { result: mai.totalList.filter({ bpm: [a, b] }), page, source: 'filter' }
     }
-    return { result }
+    const single = s.match(/^(\d+(?:\.\d+)?)(?:\s+(\d+))?$/)
+    if (single) {
+      if (single[2]) page = parseInt(single[2], 10)
+      return { result: mai.totalList.filter({ bpm: parseFloat(single[1]) }), page, source: 'filter' }
+    }
+    return {
+      error: [
+        'bpm查歌参数错误，页数为可选：',
+        'bpm查歌「bpm」「页数」（如 bpm200、bpm200 3）',
+        'bpm查歌「最小bpm-最大bpm」「页数」（连接符 - 或 ~，如 bpm200-300、bpm180~200 2）',
+        '',
+      ].join('\n'),
+    }
   }
 
   // 曲师 / 谱师
@@ -139,7 +155,7 @@ export function parseSongQuery(rawArgs) {
   const result = cmd === '曲师'
     ? mai.totalList.filter({ artist: name })
     : mai.totalList.filter({ charter: name, all_diff: false })
-  return { result }
+  return { result, page, source: 'filter' }
 }
 
 /** 单曲文本行（源 `f"「{id}」":<7` 语义） */
@@ -155,18 +171,32 @@ export class MaiSong extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s+(?:song|查歌)(?:\\s+(.+))?$`, fnc: 'query' },
-        { reg: `^[#/]${H()}\\s+what\\s+(.+)$`, fnc: 'whatIs' },
+        { reg: `^[#/]${H()}\\s*(?:song|查歌)(?:\\s+(.+))?$`, fnc: 'query' },
+        { reg: `^[#/]${H()}\\s*(?:search|检索|搜索)(?:\\s+(.+))?$`, fnc: 'search' },
+        { reg: `^[#/]${H()}\\s*what\\s+(.+)$`, fnc: 'whatIs' },
       ],
     })
   }
 
-  /** #mai song / #mai 查歌 */
+  /** #mai song / #mai 查歌：精确直查详情卡；多条自动降级列表 */
   async query(e) {
+    return await this.runQuery(e, { forceList: false })
+  }
+
+  /** #mai search / #mai 检索：跳过详情卡，一律列表（对齐 phi-plugin `#phi search` 心智） */
+  async search(e) {
+    return await this.runQuery(e, { forceList: true })
+  }
+
+  async runQuery(e, { forceList }) {
     if (!(await ensureReady(e))) return true
-    const args = ((e.msg.match(REG_SONG()) || [])[1] || '').trim()
+    const reg = forceList ? REG_SEARCH() : REG_SONG()
+    const args = ((e.msg.match(reg) || [])[1] || '').trim()
     if (!args) {
-      await this.reply('没有找到这样的乐曲。\n※ 如果是别名请使用「XXX是什么歌」指令进行查询哦。', true)
+      await this.reply(
+        forceList ? '请输入检索关键词（曲名/别名/定数/bpm/曲师/谱师）' : '没有找到这样的乐曲。\n※ 如果是别名请使用「XXX是什么歌」指令进行查询哦。',
+        true,
+      )
       return true
     }
     const parsed = parseSongQuery(args)
@@ -174,7 +204,7 @@ export class MaiSong extends plugin {
       await this.reply(parsed.error.trimEnd(), true)
       return true
     }
-    const { result, page } = parsed
+    const { result, page, source } = parsed
     const songs = result
 
     if (!songs.length) {
@@ -185,14 +215,22 @@ export class MaiSong extends plugin {
     const got = await getUserAndAuth(e, { requireAuth: true, checkSkip: true, botName: botName() })
     const user = got?.user ?? null
 
-    if (songs.length === 1) {
+    // 别名来源多命中：按「什么歌」通道同款给提示头 + id 精确查询指引（源查歌通道无头，
+    // 但别名直查是本插件友好化扩展，多曲时需要说明来源与下一步）
+    const aliasHeader = source === 'alias' && songs.length > 1
+      ? `找到 ${songs.length} 个相同别名的曲目：`
+      : null
+    const idHint = aliasHeader ? '※ 发送「#mai song <ID>」可直接查询指定曲目' : null
+
+    if (!forceList && songs.length === 1) {
       const payload = await drawChartInfo(songs[0], user)
       await this.reply(toSegment(payload), true)
     } else if (songs.length <= 5) {
-      await this.reply(songs.map(songLine).join('\n'), true)
+      const body = songs.map(songLine).join('\n')
+      await this.reply(aliasHeader ? [aliasHeader, body, idHint].join('\n') : body, true)
     } else {
       const image = await drawSongList(songs, page)
-      await this.reply(toSegment(image), true)
+      await this.reply(aliasHeader ? [aliasHeader, toSegment(image), idHint] : toSegment(image), true)
     }
     return true
   }
@@ -323,7 +361,7 @@ export class MaiAlias extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s+alias\\s+(.+)$`, fnc: 'queryAlias' },
+        { reg: `^[#/]${H()}\\s*alias\\s+(.+)$`, fnc: 'queryAlias' },
       ],
     })
   }
@@ -339,7 +377,7 @@ export class MaiAlias extends plugin {
 
     // 动作词预留（P3 管理/投票路由，勿落到通配查询）
     if (['sync', 'local', 'apply', 'vote', 'votes'].includes(raw.split(/\s+/)[0])) {
-      await this.reply(`「${raw.split(/\s+/)[0]}」属于别名管理指令，将在后续版本开放。`, true)
+      await this.reply(`「${raw.split(/\\s+/)[0]}」属于别名管理指令，将在后续版本开放。`, true)
       return true
     }
 

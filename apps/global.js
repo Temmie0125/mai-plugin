@@ -14,9 +14,9 @@ import { awaitPickSong, handlePickSong, findSongCandidates } from '../lib/pickSo
 
 const H = () => head()
 
-const REG_GINFO = () => new RegExp(`^[#/]${H()}\\s+ginfo\\s+(.+)$`)
-const REG_RANK = () => new RegExp(`^[#/]${H()}\\s+(?:rank|排行榜)(?:\\s+(.+))?$`)
-const REG_MYRANK = () => new RegExp(`^[#/]${H()}\\s+(?:myrank|我的排名)\\s*$`)
+const REG_GINFO = () => new RegExp(`^[#/]${H()}\\s*ginfo\\s+(.+)$`)
+const REG_RANK = () => new RegExp(`^[#/]${H()}\\s*(?:rank|排行榜)(?:\\s+(.+))?$`)
+const REG_MYRANK = () => new RegExp(`^[#/]${H()}\\s*(?:myrank|我的排名)\\s*$`)
 
 const LEVEL_COLORS = '绿黄红紫白'
 
@@ -28,9 +28,9 @@ export class MaiGlobal extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s+ginfo\\s+(.+)$`, fnc: 'chartGlobal' },
-        { reg: `^[#/]${H()}\\s+(?:rank|排行榜)(?:\\s+(.+))?$`, fnc: 'rank' },
-        { reg: `^[#/]${H()}\\s+(?:myrank|我的排名)\\s*$`, fnc: 'myRank' },
+        { reg: `^[#/]${H()}\\s*ginfo\\s+(.+)$`, fnc: 'chartGlobal' },
+        { reg: `^[#/]${H()}\\s*(?:rank|排行榜)(?:\\s+(.+))?$`, fnc: 'rank' },
+        { reg: `^[#/]${H()}\\s*(?:myrank|我的排名)\\s*$`, fnc: 'myRank' },
       ],
     })
   }
