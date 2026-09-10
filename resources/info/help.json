@@ -38,9 +38,9 @@
         "desc": "根据别名反查歌曲"
       },
       {
-        "title": "fsline <分数线> [容错]",
-        "eg": "#{head} fsline 100.5",
-        "desc": "计算目标达成率的分数线"
+        "title": "fsline [难度色]<曲名|id|别名> <目标达成率>",
+        "eg": "#{head} fsline 紫799 100",
+        "desc": "计算目标达成率的分数线容错（帮助：#{head} fsline 帮助）"
       },
       {
         "title": "rank [页码|用户名]",
@@ -63,14 +63,14 @@
         "desc": "查看指定定数的歌曲表"
       },
       {
-        "title": "plate <定数> <条件>",
-        "eg": "#{head} plate 14 fc",
-        "desc": "完成表：fc/ap/fs/fsd/sss 等条件"
+        "title": "plate <定数> [fc|ap]",
+        "eg": "#{head} plate 13 fc",
+        "desc": "定数完成表（fc/ap 计划；不填为全清表）"
       },
       {
         "title": "plate <版本称号> [页]",
         "eg": "#{head} plate 真极",
-        "desc": "版本牌子完成表（如：真极）"
+        "desc": "版本牌子完成表（如：真极；舞/霸分两页）"
       },
       {
         "title": "plate <版本称号> 进度",
@@ -155,7 +155,7 @@
       {
         "title": "rise [等级] [分数]",
         "eg": "#{head} rise 14 20",
-        "desc": "上分推荐"
+        "desc": "上分推荐（旧/新版本两列；@他人可查对方）"
       },
       {
         "title": "*随机 <段位>",

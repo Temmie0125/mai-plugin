@@ -44,6 +44,48 @@ AssetsImage._load_image()
 
 os.makedirs(OUT, exist_ok=True)
 
+# 定数表/完成表的**预生成整页底图**改写到本脚本的临时目录：
+#  1) 不污染用户真实资源包目录（那是 NoneBot 实例的运行时产物）；
+#  2) 关键——绝不读取本机那批写着旧 bot 名的陈旧缓存当基准，否则既产生页脚 hard 带，
+#     又是「拿旧数据产物验证新数据重建」。此处用**源代码**以当前曲库重新生成底图，
+#     于是参照侧与 Yunzai 侧同数据、同坐标，比对才有意义（ADR-7 的独立验证）。
+BASES = os.path.join(OUT, 'bases')
+os.makedirs(BASES, exist_ok=True)
+
+
+def patch_table_dirs():
+    """把各模块里 `from ...resources import xxx_dir` 绑定的 Path 重定向到 BASES"""
+    import nonebot_plugin_maimaidx.core.image.update_table as _ut
+    import nonebot_plugin_maimaidx.core.image.rating_table as _rt
+    import nonebot_plugin_maimaidx.core.image.plate_table as _pt
+    for mod in (_ut, _rt, _pt):
+        if hasattr(mod, 'rating_table_dir'):
+            mod.rating_table_dir = type(_ut.rating_table_dir)(BASES)
+        if hasattr(mod, 'plate_table_dir'):
+            mod.plate_table_dir = type(_ut.plate_table_dir)(BASES)
+
+
+def build_bases(levels, plate_versions=None, wu=False):
+    """以源代码重新生成所需底图（只做 fixture 用到的，避免全量重绘耗时）"""
+    from nonebot_plugin_maimaidx.core.image.update_table import UpdateTable
+    import nonebot_plugin_maimaidx.core.image.update_table as _ut
+    patch_table_dirs()
+    ut = UpdateTable()
+    for lv in levels:
+        if lv == '15':
+            asyncio.run(ut.update_level_15_rating_table())
+        else:
+            # update_rating_table 迭代 self.level_list[:-1]（15 由独立方法负责），
+            # 故补一个哨兵占位，只画所需等级
+            ut.level_list = [lv, '__sentinel__']
+            asyncio.run(ut.update_rating_table())
+    if plate_versions is not None:
+        ut.version_list = list(plate_versions)
+        asyncio.run(ut.update_plate_table())
+    if wu:
+        asyncio.run(ut.update_wu_plate_table())
+    print(f'[base] 底图重建完成 → {BASES}  {sorted(os.listdir(BASES))[:6]} …')
+
 
 def song_by_id(merged, sid):
     return Song.model_validate(merged[sid])
@@ -134,6 +176,129 @@ def main():
     list_ids = fixtures['songlist']['ids']
     songs = [song_by_id(merged, sid) for sid in list_ids]
     save('songlist', song_list(songs, 1))
+
+    # ---- 定数表（P2b）：底图由源代码按当前曲库重建，再叠 Level 标题 ----
+    plate_json = os.path.join(STATIC, 'data', 'plate_data.json')
+    mai.total_level_data = mai.total_list.by_level_list()
+    with open(plate_json, encoding='utf8') as f:
+        mai.total_plate_id_list = json.load(f)
+
+    from nonebot_plugin_maimaidx.core.image.rating_table import DrawRatingTable
+
+    lv_main = fixtures['table']['rating']
+    lv15 = fixtures['table15']['rating']
+    build_bases([lv_main, lv15])
+    for tag, lv in (('table', lv_main), ('table15', lv15)):
+        save(tag, DrawRatingTable(lv, level_text=True).draw())
+
+    # ---- 定数完成表（×0.8）：同一份确定性成绩行驱动 ----
+    for tag, key in (('plate', 'plate'), ('plate_full', 'plateFull'), ('plate_fc', 'plateFc')):
+        spec = fixtures[key]
+        play_result = [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['rows']]
+        save(tag, DrawRatingTable(
+            spec['rating'],
+            service=ServiceName.DIVINGFISH,
+            play_result=play_result,
+            plan=spec['plan'],
+        ).draw())
+
+    # ---- 版本称号完成表（底图按页重建；舞-1/舞-2 由 update_wu_plate_table 生成）----
+    from nonebot_plugin_maimaidx.constants import VERSION_MAP as SRC_VERSION_MAP
+    from nonebot_plugin_maimaidx.core.image.plate_table import DrawPlateTable
+
+    if any(k in fixtures for k in ('plateZhenji', 'plateWu1', 'plateWu2')):
+        build_bases([], plate_versions=['真'], wu=True)
+
+    for tag, key in (('plate_zhenji', 'plateZhenji'),
+                     ('plate_wu1', 'plateWu1'),
+                     ('plate_wu2', 'plateWu2')):
+        spec = fixtures[key]
+        rows = [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['rows']]
+        _ver, version_name = SRC_VERSION_MAP[spec['version']]
+        save(tag, DrawPlateTable(
+            ServiceName.DIVINGFISH, rows,
+            plan=spec['plan'], version=spec['version'],
+            version_name=version_name, page=spec['page'],
+        ).draw())
+
+    # ---- 牌子进度（每难度未完成清单）----
+    from nonebot_plugin_maimaidx.core.image.plate_table import DrawPlateProgress
+
+    for tag, key in (('plateprogress_zhenji', 'plateProgressZhen'),
+                     ('plateprogress_wu', 'plateProgressWu')):
+        spec = fixtures[key]
+        rows = [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['rows']]
+        _v, version_name = SRC_VERSION_MAP[spec['version']]
+        save(tag, DrawPlateProgress(
+            ServiceName.DIVINGFISH, rows,
+            plan=spec['plan'], version=spec['version'],
+            version_name=version_name, page=1,
+        ).draw())
+
+    # ---- 等级进度 / 分数列表 ----
+    # 整段交回**源代码**产出：只把 get_player_result 打桩成 fixture 成绩，
+    # 于是分组/排序/分页/高度全部由 draw_level_progress / draw_level_score_list 决定，
+    # 参照侧不含任何本脚本自写的整形逻辑（避免"用自己的实现验自己的实现"）。
+    from nonebot_plugin_maimaidx.core.merge.models.enum import Category
+    from nonebot_plugin_maimaidx.core import handler as src_handler
+
+    async def _fake_player_result(user, version=None):
+        return _progress_rows
+    _progress_rows = []
+    src_handler.get_player_result = _fake_player_result
+
+    from nonebot_plugin_maimaidx.core.image.score import DrawScore  # noqa: F401  (链路校验)
+
+    CATEGORY_OF = {
+        'default': Category.DEFAULT,
+        'completed': Category.COMPLETED,
+        'unfinished': Category.UNFINISHED,
+        'notplayed': Category.NOTPLAYED,
+    }
+
+    def _msg_to_b64(seg):
+        return seg.data['file']
+
+    for tag, key in (('progress', 'progress'),
+                     ('progress_unfinished', 'progressUnfinished'),
+                     ('progress_notplayed', 'progressNotplayed')):
+        spec = fixtures[key]
+        _progress_rows = [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['rows']]
+        seg = asyncio.run(src_handler.draw_level_progress(
+            User(qqid=114514), spec['level'], spec['plan'],
+            CATEGORY_OF[spec['category']], spec['page'],
+        ))
+        save(tag, _msg_to_b64(seg))
+
+    for tag, key in (('scorelist', 'scorelist'), ('scorelist_last', 'scorelistLast')):
+        spec = fixtures[key]
+        _progress_rows = [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['rows']]
+        seg = asyncio.run(src_handler.draw_level_score_list(
+            User(qqid=114514), spec['rating'], spec['page'],
+        ))
+        save(tag, _msg_to_b64(seg))
+
+    # ---- 上分推荐 ----
+    # 源用 `random.sample` 抽样，两侧各自随机必然出不同图 → 把 random.sample 打成
+    # 与 fixtures 侧注入的确定性采样器同一规则（取前 k 个），于是比对校验的是
+    # 「算法 + 版式」，抽样随机性交给 tests/rise.test.js。
+    import random as _random
+    _random.sample = lambda pop, k: list(pop)[:k]
+
+    spec = fixtures['rise']
+    _progress_rows = [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['playResult']]
+    best = Best50.model_validate({
+        'sd': [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['best50']['sd']],
+        'dx': [played_from_record(song_by_id(merged, r['song_id']), r) for r in spec['best50']['dx']],
+        'sd_total': 0, 'dx_total': 0,
+    })
+
+    async def _fake_best50(user, **kwargs):
+        return (None, best)
+    src_handler.get_best50 = _fake_best50
+
+    seg = asyncio.run(src_handler.draw_rise_score_list(User(qqid=114514), spec['level'], spec['score']))
+    save('rise', _msg_to_b64(seg))
 
     print(f'\n参照图完成 → {OUT}')
 

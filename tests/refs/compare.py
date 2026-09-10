@@ -32,6 +32,23 @@ PAGES = [
     ('song_utage', 'song-utage.jpg', 'song_utage_ref.png'),
     ('song_utage_buddy', 'song-utage-buddy.jpg', 'song_utage_buddy_ref.png'),
     ('songlist', 'songlist.jpg', 'songlist_ref.png'),
+    # P2b 表格族：参照底图由 make_refs.py 以**源代码**按当前曲库重建（不读旧缓存），见该脚本注释
+    ('table', 'table.jpg', 'table_ref.png'),
+    ('table15', 'table-15.jpg', 'table15_ref.png'),
+    ('plate', 'plate.jpg', 'plate_ref.png'),
+    ('plate_full', 'plate-full.jpg', 'plate_full_ref.png'),
+    ('plate_fc', 'plate-fc.jpg', 'plate_fc_ref.png'),
+    ('plate_zhenji', 'plate-zhenji.jpg', 'plate_zhenji_ref.png'),
+    ('plate_wu1', 'plate-wu1.jpg', 'plate_wu1_ref.png'),
+    ('plate_wu2', 'plate-wu2.jpg', 'plate_wu2_ref.png'),
+    ('plateprogress_zhenji', 'plateprogress-zhenji.jpg', 'plateprogress_zhenji_ref.png'),
+    ('plateprogress_wu', 'plateprogress-wu.jpg', 'plateprogress_wu_ref.png'),
+    ('progress', 'progress.jpg', 'progress_ref.png'),
+    ('progress_unfinished', 'progress-unfinished.jpg', 'progress_unfinished_ref.png'),
+    ('progress_notplayed', 'progress-notplayed.jpg', 'progress_notplayed_ref.png'),
+    ('scorelist', 'scorelist.jpg', 'scorelist_ref.png'),
+    ('scorelist_last', 'scorelist-last.jpg', 'scorelist_last_ref.png'),
+    ('rise', 'rise.jpg', 'rise_ref.png'),
 ]
 
 

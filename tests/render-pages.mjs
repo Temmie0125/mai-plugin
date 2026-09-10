@@ -40,8 +40,15 @@ const {
   b50View, playDataView, chartInfoView, chartInfoBanquetView, songListView, globalDataView,
 } = await import('../lib/render/views.js')
 const {
-  renderBest50, renderPlayData, renderChartInfo, renderSongList, renderGlobalData,
+  renderBest50, renderPlayData, renderChartInfo, renderSongList, renderGlobalData, renderPanel,
 } = await import('../lib/render/picmodle.js')
+const { ratingTableView, plateTableView } = await import('../lib/render/tableViews.js')
+const { plateProgressView, levelPlanView, levelCategoryView, levelScoreListView } = await import('../lib/render/scoreViews.js')
+const { processRatingTableData, processPlateTable, processLevelProgress, processLevelScoreList } = await import('../lib/tableData.js')
+const { levelPlanHeights, levelScoreListLayout } = await import('../lib/tableLayout.js')
+const { getRiseScoreList } = await import('../lib/tableData.js')
+const { riseView } = await import('../lib/render/scoreViews.js')
+const { VERSION_MAP } = await import('../lib/constants.js')
 
 const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'out')
 fs.mkdirSync(outDir, { recursive: true })
@@ -189,7 +196,7 @@ const b50f = makeB50()
 const vB50 = b50View({
   theme: 'prism_plus', qqid: null,
   player: b50f.player, best50: b50f.best50,
-  serviceName: 'DivingFish', botName: 'MaiTest',
+  serviceName: 'Diving-Fish', botName: 'MaiTest',
 })
 results.b50 = await shot('b50', await renderBest50(vB50))
 
@@ -201,7 +208,7 @@ const rows4 = s4.difficulties.map((_, li) => (li === 2
   : { notPlayed: false, ...makeRecord(s4, li) }))
 const vScore = playDataView({
   theme: 'prism_plus', song: s4, playResult: rows4,
-  serviceName: 'DivingFish', botName: 'MaiTest',
+  serviceName: 'Diving-Fish', botName: 'MaiTest',
 })
 results.score = await shot('score', await renderPlayData(vScore))
 
@@ -238,6 +245,213 @@ const gSong = mai.totalList.root.find(s => s.difficulties[3]?.stats?.fc_dist?.le
 const vGlobal = globalDataView({ song: gSong, levelIndex: 3 })
 results.global = await shot('global', await renderGlobalData(vGlobal))
 
+// -- 6. 定数表（ADR-7：底图由本插件按源 update_table.py 坐标重画，不读预生成 PNG）--
+// 取定数组最多的标签，覆盖多组/多行；15 另走大格布局且**必然带占位格**（当前数据仅 2 首）
+const busiestLevel = Object.entries(mai.totalLevelData)
+  .map(([lv, bucket]) => [lv, Object.values(bucket).reduce((a, b) => a + b.length, 0)])
+  .sort((a, b) => b[1] - a[1])[0][0]
+const vTable = ratingTableView({
+  rating: busiestLevel, levelData: mai.totalLevelData[busiestLevel], levelText: true, botName: 'MaiTest',
+})
+results.table = await shot('table', await renderPanel('table', vTable))
+
+const vTable15 = ratingTableView({
+  rating: '15', levelData: mai.totalLevelData['15'], levelText: true, botName: 'MaiTest',
+})
+results.table15 = await shot('table-15', await renderPanel('table-15', vTable15))
+
+// -- 7. 定数完成表（整图 ×0.8；覆盖 complete_1/unfinished_1、评级图标、FC 图标、全清徽章）--
+// 成绩完全确定式生成（不依赖 rng 调用序），两侧同表同值
+function makeTableRecord(simple, { ach, fc = null, fs = null }) {
+  const diff = simple.difficulties
+  const dxMax = diff.dx_score ?? 0
+  return {
+    song_id: simple.song_id,
+    level_index: diff.level_index,
+    level_value: diff.level_value,
+    level: diff.level,
+    type: simple.song_id < 10000 ? 'sd' : 'dx',
+    achievements: ach,
+    dx_score: Math.round((dxMax * (80 + (simple.song_id % 200) / 10)) / 100),
+    song_name: mai.totalList.byId(simple.song_id)?.song_name ?? String(simple.song_id),
+    rate: computeRating(diff.level_value, ach, { onlyrate: true }).toLowerCase(),
+    rating: computeRating(diff.level_value, ach),
+    fc,
+    fs,
+  }
+}
+const lv13Songs = Object.values(mai.totalLevelData['13']).flat()
+const achOf = (i) => 96 + ((i * 7) % 50) / 10 // 96.0～100.9，混出 <100 与 ≥100
+
+// ① 部分游玩：每 6 首留 1 首未游玩 → 同时出现 complete_1 与 unfinished_1
+const plateRows = lv13Songs.filter((_, i) => i % 6 !== 5)
+  .map((s, i) => makeTableRecord(s, {
+    ach: achOf(i), fc: i % 3 === 0 ? 'fc' : (i % 3 === 1 ? 'ap' : null), fs: i % 4 === 0 ? 'fsd' : null,
+  }))
+// ② 全清（RANK 路）：全谱面 ≥100.5 → 触发 Allclear 徽章 SSSp
+const plateFullRows = lv13Songs.map((s, i) => makeTableRecord(s, {
+  ach: 100.5, fc: i % 2 === 0 ? 'app' : null, fs: i % 3 === 0 ? 'fsdp' : null,
+}))
+// ③ fc 计划（COMBO 路）：全谱面 ap → 触发 50×50 FC 图标与 Allclear AP 徽章
+const plateFcRows = lv13Songs.map(s => makeTableRecord(s, { ach: 100.5, fc: 'ap' }))
+
+function plateFixture(rows, plan) {
+  const { statistics, playedMap } = processRatingTableData('13', rows)
+  return ratingTableView({
+    rating: '13', levelData: mai.totalLevelData['13'], plan, statistics, playedMap, botName: 'MaiTest',
+  })
+}
+results.plate = await shot('plate', await renderPanel('plate', plateFixture(plateRows, false)))
+results['plate-full'] = await shot('plate-full', await renderPanel('plate-full', plateFixture(plateFullRows, false)))
+results['plate-fc'] = await shot('plate-fc', await renderPanel('plate-fc', plateFixture(plateFcRows, true)))
+
+// -- 8. 版本称号完成表（含舞/霸的两页与 5 槽位白谱点）--
+// 成绩按「曲 id + 槽位」确定式生成，两侧共用同一份行，避免各自推导漂移
+function plateRecords(ids, plan) {
+  const remasterIdSet = new Set(mai.totalPlateIdList['舞ReMASTER'] ?? [])
+  const out = []
+  ids.forEach((sid, i) => {
+    const song = mai.totalList.byId(sid)
+    if (!song) return
+    const slots = remasterIdSet.has(sid) && song.difficulties[4] ? 5 : 4
+    for (let li = 0; li < Math.min(slots, song.difficulties.length); li++) {
+      const d = song.difficulties[li]
+      const ach = plan === '将' || plan === '者' ? (i % 5 === 0 ? 99.5 : 100.5) : 100.5
+      out.push({
+        song_id: sid, level_index: li, level_value: d.level_value, level: d.level,
+        type: sid < 10000 ? 'sd' : 'dx', achievements: ach, dx_score: 0,
+        song_name: song.song_name,
+        rate: computeRating(d.level_value, ach, { onlyrate: true }).toLowerCase(),
+        rating: computeRating(d.level_value, ach),
+        // 极/神 看 fc，舞舞 看 fs；其余留 null
+        fc: (plan === '极' || plan === '神') ? ['ap', 'fc', 'fcp', null][i % 4] : null,
+        fs: plan === '舞舞' ? (i % 3 === 0 ? 'fsd' : null) : null,
+      })
+    }
+  })
+  return out
+}
+
+function plateTableFixture(version, plan, page) {
+  const [versionList, versionName] = VERSION_MAP[version]
+  const isWu = version === '舞' || version === '霸'
+  const ids = isWu ? mai.totalPlateIdList['舞'] : mai.totalPlateIdList[versionName]
+  const playResult = plateRecords(ids, plan)
+  const data = processPlateTable({
+    version, versionName, isWu, page, plan, playResult,
+    plateIdList: mai.totalPlateIdList, totalList: mai.totalList,
+  })
+  const remasterIdSet = isWu ? new Set(mai.totalPlateIdList['舞ReMASTER'] ?? []) : null
+  return {
+    view: plateTableView({ version, isWu, page, plan, data, remasterIdSet, botName: 'MaiTest' }),
+    rows: playResult,
+  }
+}
+
+const fxZhenji = plateTableFixture('真', '极', 1)
+results.plateZhenji = await shot('plate-zhenji', await renderPanel('plate-zhenji', fxZhenji.view))
+const fxWu1 = plateTableFixture('舞', '将', 1)
+results.plateWu1 = await shot('plate-wu1', await renderPanel('plate-wu1', fxWu1.view))
+const fxWu2 = plateTableFixture('舞', '将', 2)
+results.plateWu2 = await shot('plate-wu2', await renderPanel('plate-wu2', fxWu2.view))
+
+// -- 9. 牌子进度（每难度未完成清单；舞将的 Master 未完成 >51 → 触发「余 N 个未完成」中断分支）--
+function plateProgressFixture(version, plan) {
+  const [, versionName] = VERSION_MAP[version]
+  const isWu = version === '舞' || version === '霸'
+  const ids = isWu ? mai.totalPlateIdList['舞'] : mai.totalPlateIdList[versionName]
+  const rows = plateRecords(ids, plan)
+  const data = processPlateTable({
+    version, versionName, isWu, page: 1, plan, playResult: rows,
+    plateIdList: mai.totalPlateIdList, totalList: mai.totalList,
+  })
+  return { view: plateProgressView({ version, isWu, plan, data, botName: 'MaiTest' }), rows }
+}
+const fxProgZhen = plateProgressFixture('真', '极')
+results.plateProgressZhen = await shot('plateprogress-zhenji',
+  await renderPanel('plateprogress-zhenji', fxProgZhen.view))
+const fxProgWu = plateProgressFixture('舞', '将')
+results.plateProgressWu = await shot('plateprogress-wu',
+  await renderPanel('plateprogress-wu', fxProgWu.view))
+
+// -- 10. 等级进度（三段版 / 单类别版）与分数列表 --
+// 成绩：每 5 首留 1 首未游玩；fc 按 5 循环混出 ap/app（达成）/ fc/fcp（未达成）/ null
+const progressRows = lv13Songs
+  .filter((_, i) => i % 5 !== 4)
+  .map((s, i) => makeTableRecord(s, { ach: 99 + (i % 12) / 10, fc: ['ap', 'app', 'fc', 'fcp', null][i % 5] }))
+
+function progressFixture(level, plan, category, page = 1) {
+  const { completed, unfinished, notplayed } = processLevelProgress({
+    level, plan, playResult: progressRows, byPlan: mai.totalList.byPlan(level),
+  })
+  const heights = levelPlanHeights({ category, completed, unfinished, notplayed, page })
+  const common = { serviceName: 'Diving-Fish', botName: 'MaiTest' }
+  const view = heights.mode === 'plan'
+    ? levelPlanView({ level, plan, completed, unfinished, notplayed, heights, cmdHead: 'mai', ...common })
+    : levelCategoryView({
+      category,
+      data: heights.mode === 'notplayed' ? notplayed : (category === 'completed' ? completed : unfinished),
+      heights,
+      ...common,
+    })
+  return { view, rows: progressRows, counts: { completed: completed.length, unfinished: unfinished.length, notplayed: notplayed.length } }
+}
+
+const fxProg = progressFixture('13', 'ap', 'default')
+console.log('  · 等级进度 13/ap 三段计数:', JSON.stringify(fxProg.counts), ' 高度', fxProg.view.height)
+results.progress = await shot('progress', await renderPanel('progress', fxProg.view))
+
+const fxProgUnfinished = progressFixture('13', 'ap', 'unfinished')
+results.progressUnfinished = await shot('progress-unfinished', await renderPanel('progress-unfinished', fxProgUnfinished.view))
+
+const fxProgNotplayed = progressFixture('13', 'ap', 'notplayed')
+results.progressNotplayed = await shot('progress-notplayed', await renderPanel('progress-notplayed', fxProgNotplayed.view))
+
+// 分数列表：100 条 → 非末页与末页两条公式都要走到，故出两页
+const scoreListRows = processLevelScoreList({ rating: '13', playResult: progressRows })
+const fxList = (page) => {
+  const lay = levelScoreListLayout(scoreListRows.length, page)
+  return levelScoreListView({
+    rating: '13', playResult: scoreListRows, page: lay.page, endPage: lay.endPage,
+    serviceName: 'Diving-Fish', botName: 'MaiTest',
+  })
+}
+console.log('  · 分数列表 13：共', scoreListRows.length, '条 →', levelScoreListLayout(scoreListRows.length, 1).endPage, '页')
+results.scorelist = await shot('scorelist', await renderPanel('scorelist', fxList(1)))
+results.scorelistLast = await shot('scorelist-last',
+  await renderPanel('scorelist-last', fxList(levelScoreListLayout(scoreListRows.length, 1).endPage)))
+
+// -- 11. 上分推荐（旧/新版本两列；crop((200,0,1200,960)) → 1000×960）--
+// ⚠️ 源的 `random.sample` 使抽样不确定 → 两侧出图不同。此处注入**确定性采样器**，
+// 参照侧 make_refs.py 把 `random.sample` 打成同一规则，于是比对校验的是算法与版式，
+// 抽样本身由 tests/rise.test.js 单测覆盖。
+const risePlayResult = lv13Songs
+  .filter((_, i) => i % 3 === 0)
+  .map((s, i) => makeTableRecord(s, { ach: 98 + (i % 10) / 10, fc: 'fc', fs: 'fs' }))
+const riseShuffled = [...risePlayResult].sort((a, b) => b.rating - a.rating)
+const riseB50 = {
+  sd: riseShuffled.filter(r => r.song_id < 10000).slice(0, 25),
+  dx: riseShuffled.filter(r => r.song_id >= 10000).slice(0, 15),
+}
+const detSample = (arr, k) => arr.slice(0, k)
+
+function riseFixture(level, score) {
+  const oldRecords = new Map(risePlayResult.map(v => [`${v.song_id}-${v.level_index}`, v]))
+  const deps = { totalList: mai.totalList, sample: detSample }
+  const sd = getRiseScoreList(oldRecords, 'sd', riseB50.sd, level, score, deps)
+  const dx = getRiseScoreList(oldRecords, 'dx', riseB50.dx, level, score, deps)
+  console.log(`  · 上分推荐 level=${level} score=${score}: sd ${sd.list.length} 条(ds ${sd.list.map(r => r.level_value).join('/')}) · dx ${dx.list.length} 条`)
+  return {
+    view: riseView({
+      sd: sd.list, sdLow: sd.lowestRa, dx: dx.list, dxLow: dx.lowestRa,
+      serviceName: 'Diving-Fish', botName: 'MaiTest',
+    }),
+    sd, dx,
+  }
+}
+const fxRise = riseFixture('13', 10)
+results.rise = await shot('rise', await renderPanel('rise', fxRise.view))
+
 // fixture 明细落盘（供 NoneBot 侧参照图脚本）
 fs.writeFileSync(path.join(outDir, 'fixtures.json'), JSON.stringify({
   b50: b50f,
@@ -248,6 +462,27 @@ fs.writeFileSync(path.join(outDir, 'fixtures.json'), JSON.stringify({
   songUtageBuddy: { song_id: ut2.song_id },
   songlist: { ids: lv14.map(s => s.song_id) },
   global: { song_id: gSong.song_id, levelIndex: 3 },
+  table: { rating: busiestLevel },
+  table15: { rating: '15' },
+  // 完成表三态：两侧共用同一份确定性成绩行（避免各自推导产生顺序漂移）
+  plate: { rating: '13', plan: false, rows: plateRows },
+  plateFull: { rating: '13', plan: false, rows: plateFullRows },
+  plateFc: { rating: '13', plan: true, rows: plateFcRows },
+  plateZhenji: { version: '真', plan: '极', page: 1, rows: fxZhenji.rows },
+  plateWu1: { version: '舞', plan: '将', page: 1, rows: fxWu1.rows },
+  plateWu2: { version: '舞', plan: '将', page: 2, rows: fxWu2.rows },
+  plateProgressZhen: { version: '真', plan: '极', rows: fxProgZhen.rows },
+  plateProgressWu: { version: '舞', plan: '将', rows: fxProgWu.rows },
+  progress: { level: '13', plan: 'ap', category: 'default', page: 1, rows: fxProg.rows },
+  progressUnfinished: { level: '13', plan: 'ap', category: 'unfinished', page: 1, rows: fxProgUnfinished.rows },
+  progressNotplayed: { level: '13', plan: 'ap', category: 'notplayed', page: 1, rows: fxProgNotplayed.rows },
+  scorelist: { rating: '13', page: 1, rows: scoreListRows },
+  scorelistLast: { rating: '13', page: levelScoreListLayout(scoreListRows.length, 1).endPage, rows: scoreListRows },
+  rise: {
+    level: '13', score: 10,
+    playResult: risePlayResult,
+    best50: { sd: riseB50.sd, dx: riseB50.dx, sd_total: 0, dx_total: 0 },
+  },
 }, null, 2))
 console.log(`[ok] fixtures.json → ${path.join(outDir, 'fixtures.json')}`)
 

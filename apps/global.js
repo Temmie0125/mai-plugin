@@ -5,7 +5,10 @@
  */
 import plugin from '../../../lib/plugins/plugin.js'
 import { head } from '../lib/config.js'
-import { drawSongGlobalData, getRatingRanking, rankNameText, rankListText, myRatingRankingText } from '../lib/handler.js'
+import {
+  FSLINE_FORMAT_ERROR, FSLINE_HELP, drawSongGlobalData, fslineText, getRatingRanking,
+  myRatingRankingText, rankListText, rankNameText,
+} from '../lib/handler.js'
 import { toSegment } from '../lib/render/picmodle.js'
 import { mai, ensureReady } from '../lib/service.js'
 import { handleErrors } from '../lib/handlerError.js'
@@ -17,6 +20,7 @@ const H = () => head()
 const REG_GINFO = () => new RegExp(`^[#/]${H()}\\s*ginfo\\s+(.+)$`)
 const REG_RANK = () => new RegExp(`^[#/]${H()}\\s*(?:rank|排行榜)(?:\\s+(.+))?$`)
 const REG_MYRANK = () => new RegExp(`^[#/]${H()}\\s*(?:myrank|我的排名)\\s*$`)
+const REG_FSLINE = () => new RegExp(`^[#/]${H()}\\s*(?:fsline|分数线)(?:\\s+(.+))?$`)
 
 const LEVEL_COLORS = '绿黄红紫白'
 
@@ -31,6 +35,7 @@ export class MaiGlobal extends plugin {
         { reg: `^[#/]${H()}\\s*ginfo\\s+(.+)$`, fnc: 'chartGlobal' },
         { reg: `^[#/]${H()}\\s*(?:rank|排行榜)(?:\\s+(.+))?$`, fnc: 'rank' },
         { reg: `^[#/]${H()}\\s*(?:myrank|我的排名)\\s*$`, fnc: 'myRank' },
+        { reg: REG_FSLINE().source, fnc: 'fsline' },
       ],
     })
   }
@@ -119,6 +124,69 @@ export class MaiGlobal extends plugin {
     }
     const payload = await drawSongGlobalData(song, levelIndex)
     await this.reply(toSegment(payload), true)
+  }
+
+  /**
+   * #mai fsline [难度色]<曲名|id|别名> <目标达成率>（源 commands/mai_score.py:113 分数线）
+   *
+   * 与源的差异（设计 §3.2-19 + 用户拍板）：
+   *  1. 源只认 `<难度色><纯数字id>`；此处把查曲扩展为与 song/score 同一管线（曲名/别名/id），
+   *     多候选走既有 pickSong 引导；
+   *  2. 达成率仍取**最后一个 token**（源 `float(args[-1])`），难度色允许空格分隔（源靠 `\s?`）；
+   *  3. 帮助为纯文本（源走 text_to_bytes_io 转图，设计 §6.4 已废除长文本转图）。
+   */
+  async fsline(e) {
+    if (!(await ensureReady(e))) return true
+    const raw = ((e.msg.match(REG_FSLINE()) || [])[1] || '').trim()
+    const args = raw.split(/\s+/).filter(Boolean)
+
+    if (args.length && args[0] === '帮助') {
+      await this.reply(FSLINE_HELP, true)
+      return true
+    }
+
+    const line = parseFloat(args[args.length - 1])
+    const m = args.slice(0, -1).join(' ').match(/^([绿黄红紫白])\s*(.+)$/)
+    if (!m || !Number.isFinite(line)) {
+      await this.reply(FSLINE_FORMAT_ERROR, true)
+      return true
+    }
+    const levelIndex = LEVEL_COLORS.indexOf(m[1])
+    const query = m[2].trim()
+
+    // 纯数字 → id 直查（源的唯一形态）
+    if (/^\d+$/.test(query)) {
+      const song = mai.totalList.byId(parseInt(query, 10))
+      if (!song) {
+        await this.reply(FSLINE_FORMAT_ERROR, true)
+        return true
+      }
+      await this.sendFsline(song, levelIndex, line)
+      return true
+    }
+
+    const found = findSongCandidates(query, mai)
+    if (!found) {
+      await this.reply('未找到曲目', true)
+      return true
+    }
+    if (found.multi) {
+      awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
+        await this.sendFsline(song, levelIndex, line)
+      })
+      return true
+    }
+    await this.sendFsline(found.song, levelIndex, line)
+    return true
+  }
+
+  /** 分数线换算与回复（handleErrors 兜住 brk==0 退化等边界） */
+  async sendFsline(song, levelIndex, line) {
+    const text = await handleErrors(async () => {
+      if (levelIndex >= song.difficulties.length) return FSLINE_FORMAT_ERROR
+      return fslineText(song, levelIndex, line)
+    })
+    await this.reply(text, true)
   }
 
   /** 多候选选曲上下文（§3.4） */

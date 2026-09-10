@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!-- 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN，https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx）及上游 mai-bot -->
+<!-- 表格/进度/列表/上分族通用画布（设计 §8.2）：
+     源 PIL 的「整页底图 + 运行时叠加」在此展开为「CSS 渐变底 + 毛玻璃卡 + 绝对定位元素」。
+     #container = 最终输出尺寸（cssWidth×cssHeight，宿主按此元素截图并 overflow 裁切）；
+     #page      = 源 PIL 坐标空间（width×height），经 scale 缩放与 cropX/cropY 偏移后落入 #container。
+     ADR-7：源 rating_table/plate_table 预生成底图不再读取，底图布局由视图在本层重建。 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @font-face { font-family: 'mai-sy'; src: url('{{_staticPath}}/font/ResourceHanRoundedCN-Bold.ttf'); }
+    @font-face { font-family: 'mai-tb'; src: url('{{_staticPath}}/font/Torus%20SemiBold.otf'); }
+    @font-face { font-family: 'mai-fot'; src: url('{{_staticPath}}/font/FOT-NewRodin%20Pro%20EB.otf'); }
+
+    /* 输出画布：唯一裁切层（源在 PIL 画布上裁一次；装饰图 aurora 1541 宽等越界依赖此裁切） */
+    #container {
+      position: relative;
+      width: {{cssWidth}}px;
+      height: {{cssHeight}}px;
+      overflow: hidden;
+      background: {{bgCss}};
+      font-family: 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+    }
+    /* 源坐标空间：scale 对应源 draw() 结尾的 im.resize()，crop 对应 im.crop() */
+    #page {
+      position: absolute;
+      left: {{pageLeft}}px;
+      top: {{pageTop}}px;
+      width: {{width}}px;
+      height: {{height}}px;
+      transform: scale({{scale}});
+      transform-origin: 0 0;
+    }
+    /* 源 generate_frosted_card：GaussianBlur(sigma) + 白层 alpha + 圆角 25 + 偏移投影
+       参数由视图注入（表格卡面积远大于 songlist 卡，需按页标定，勿写死）。
+       ⚠️ 本段必须整体包在下面的 card 条件块里：无卡页面（等级进度/分数列表/上分）card 为 null，
+       art-template 对 null 取属性会抛 TemplateError，且样式块不受 body 内条件块保护。
+       ⚠️ 另：注释里**不可出现模板定界符字面量** —— 它们会被当真编译，导致块不配对。 */
+    {{if card}}
+    .card {
+      position: absolute;
+      left: {{card.x}}px;
+      top: {{card.y}}px;
+      width: {{card.w}}px;
+      height: {{card.h}}px;
+      border-radius: {{card.radius}}px;
+      background: rgba(255, 255, 255, {{card.alpha}});
+      -webkit-backdrop-filter: blur({{card.blur}}px);
+      backdrop-filter: blur({{card.blur}}px);
+      box-shadow: {{card.shadow}};
+      z-index: {{card.z}};
+    }
+    {{/if}}
+    .abs { position: absolute; }
+    img.abs { display: block; }
+    /* 源 Image.crop 的按宽裁剪（progress_big 等进度条） */
+    img.crop { object-fit: none; object-position: 0 0; }
+    .txt {
+      position: absolute;
+      width: max-content;
+      white-space: nowrap;
+      line-height: 1;
+      transform-origin: 0 0;
+    }
+    .a-lt { }
+    .a-lm { transform: translateY(-50%); }
+    .a-rm { transform: translate(-100%, -50%); }
+    .a-mm { transform: translate(-50%, -50%); }
+    /* PIL anchor 'ld'（左-降部线）/ 'rd'（右-降部线）：line-height:1 下盒底≈降部线，
+       故整体上移一个盒高（rd 再右对齐）。
+       ⚠️ 模板缺规则时 anchor 会**静默退化为 lt**：ld 文字下移约一字高、
+       rd 文字右下移并压到邻近元素上 —— 两者都真实发生过
+       （Level. 标题 = ld，源 rating_table.py:164/185；完成表 /N 分母 = rd，plate_table.py:437）。 */
+    .a-ld { transform: translateY(-100%); }
+    .a-rd { transform: translate(-100%, -100%); }
+    .f-sy { font-family: 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-tb { font-family: 'mai-tb', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-fot { font-family: 'mai-fot', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div id="page">
+    {{each images im}}
+    <img class="abs{{if im.crop}} crop{{/if}}" src="{{im.src}}" {{if im.w}}width="{{im.w}}" height="{{im.h}}"{{/if}}
+         style="left:{{im.x}}px;top:{{im.y}}px;z-index:{{im.z}};"
+         {{if im.fallback}}onerror="this.onerror=null;this.src='{{im.fallback}}'"{{/if}}>
+    {{/each}}
+    {{if card}}<div class="card"></div>{{/if}}
+    {{each texts t}}
+    <div class="txt a-{{t.anchor}} f-{{t.font}}"
+         style="left:{{t.x}}px;top:{{t.y}}px;font-size:{{t.size}}px;color:{{t.color}};z-index:{{t.z}};{{if t.multiline}}white-space:pre-line;{{/if}}{{if t.shadow}}text-shadow:{{t.shadow}};{{/if}}">{{t.text}}</div>
+    {{/each}}
+  </div>
+</div>
+</body>
+</html>
