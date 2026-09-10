@@ -98,14 +98,9 @@
     "group": "绑定与设置",
     "list": [
       {
-        "title": "bind lxns",
+        "title": "bind <lxns|df>",
         "eg": "#{head} bind lxns",
-        "desc": "绑定落雪（授权码流；完成后自动切换数据源）"
-      },
-      {
-        "title": "bind df",
-        "eg": "#{head} bind df",
-        "desc": "绑定水鱼（服务端授权，链接即完成）"
+        "desc": "绑定查分器(支持落雪/水鱼)"
       },
       {
         "title": "bind qq <QQ号>",
