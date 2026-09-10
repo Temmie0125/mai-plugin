@@ -37,6 +37,8 @@ cd <Yunzai根>/plugins
 git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解压到 plugins/mai-plugin
 ```
 
+插件无额外依赖，开箱即用，克隆仓库后重启Bot即可。
+
 ### 2. 静态资源包（必需，约 600MB，不入 git 仓库）
 
 资源根固定为 `plugins/mai-plugin/resources/static/`，二选一：
@@ -106,6 +108,25 @@ node plugins/mai-plugin/tests/render-pages.mjs     # JS 出图 → tests/out/*.j
 node plugins/mai-plugin/tests/refs/make_refs.py    # 源 NoneBot PIL 参照图（需 venv python）
 node plugins/mai-plugin/tests/refs/compare.py      # 数值比对报告
 ```
+
+## 许可
+
+本项目 **mai-plugin** 整体以 **GNU General Public License v3.0（GPL-3.0）** 发布，完整许可证文本见仓库根目录 [`LICENSE`](LICENSE)。你可以在 GPL-3.0 条款下使用、修改和分发本项目；分发修改版、衍生作品或打包产物时，必须按 GPL-3.0 提供相应源代码，保留版权与许可声明，并附带 GPL-3.0 全文。
+
+本项目移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)，该源项目采用 **MIT License**。MIT 许可允许商业或非商业使用，但要求在所有副本或重要部分中保留原始版权声明和 MIT 许可声明。MIT 与 GPLv3 兼容；因此，源自该项目的代码部分在被纳入本项目后，整体按 GPL-3.0 分发，同时其原始 MIT 许可与版权声明继续适用，分发时不得移除。原始 MIT 许可与版权声明收录于 [`MIT-nonebot-plugin-maimaidx.txt`](MIT-nonebot-plugin-maimaidx.txt)。
+
+由于本项目作为 **TRSS-Yunzai** 插件运行，而 TRSS-Yunzai 上游采用 GPL-3.0，为满足 GPL 对衍生/组合作品的开源要求，并避免许可不确定性，本项目选择以 GPL-3.0 开源发布。
+
+分发或修改时，请遵守以下要求：
+
+- 附上仓库根目录 `LICENSE` 中的 GPL-3.0 全文；
+- 保留 `MIT-nonebot-plugin-maimaidx.txt` 或等价文件中的 MIT 许可与原始版权声明；
+- 标明本项目对 `nonebot-plugin-maimaidx` 的移植、修改关系；
+- 若分发二进制、打包资源或其他非源码形式，应按 GPL-3.0 向接收者提供对应源代码；
+- 商业使用可以，但不得通过闭源方式规避 GPL-3.0 的源码开放要求；MIT 部分仍需保留署名与许可声明；
+- 舞萌DX 相关素材、字体等第三方资源的版权限制，详见上文“美术与版权声明”。
+
+本项目按“现状”提供，不提供任何明示或默示担保。以上内容仅为许可证说明，不构成法律意见；如有疑问，请咨询专业律师。
 
 ## 鸣谢
 
