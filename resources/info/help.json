@@ -108,6 +108,11 @@
         "desc": "绑定水鱼（服务端授权，链接即完成）"
       },
       {
+        "title": "bind qq <QQ号>",
+        "eg": "#{head} bind qq 114514",
+        "desc": "（官方QQBot）补充游戏 QQ 以解锁水鱼查分器；clear 解除"
+      },
+      {
         "title": "source <0|1|lxns|df>",
         "eg": "#{head} source 1",
         "desc": "切换数据源（数字或别名；绑定落雪后已自动切换）"

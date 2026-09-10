@@ -85,8 +85,12 @@ test('bind 规则：命中/拒收样例', async () => {
   ]) {
     assert.ok(hit(msg).length === 1, `应唯一命中：${msg}`)
   }
-  for (const msg of ['#maibindlxns', '#mai bind', '#mai sourcex', 'bind lxns', '#mai song 1']) {
+  for (const msg of ['#maibindlxns', '#mai bind', '#mai sourcex', 'bind lxns', '#mai song 1', '#mai bind qqabc']) {
     assert.equal(hit(msg).length, 0, `不应命中：${msg}`)
+  }
+  // bind qq（官方QQBot 补充游戏 QQ）
+  for (const msg of ['#mai bind qq 114514', '#mai 绑定QQ 114514', '#mai bind qq', '#mai 绑定qq 1']) {
+    assert.deepEqual(hit(msg), ['bindQqCmd'], `应命中 bindQqCmd：${msg}`)
   }
   // 两档分类：落雪 HTTP 族 → 一档；网络/未知 → 二档
   assert.match(classifyBindError(new LXNSOAuthError()), /授权码可能已使用、已过期/)

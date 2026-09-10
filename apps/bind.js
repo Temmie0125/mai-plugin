@@ -28,6 +28,7 @@ const H = () => head()
 
 const REG_BIND_LXNS = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`)
 const REG_BIND_DF = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`)
+const REG_BIND_QQ = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`)
 const REG_SOURCE = () => new RegExp(`^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`)
 const REG_THEME = () => new RegExp(`^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`)
 
@@ -103,6 +104,12 @@ const LXNS_TIMEOUT_MSG = () => `授权绑定已超时，请重新发送「${LXNS
 const DIVINGFISH_OAUTH_ERROR = 'BOT管理员尚未配置水鱼查分器 OAuth 应用，无法进行绑定授权。'
 const DIVINGFISH_BIND_FAILED_MSG = '发起水鱼授权失败：水鱼账号服务可能暂时不可用，请稍后再试。'
 
+const BIND_QQ_HELP = [
+  '用法：#mai bind qq <你的QQ号>（解除：bind qq clear）',
+  '※ 官方QQBot 环境只有 openid、读不到 QQ 号；水鱼查分器按 QQ 代查需你主动提供一次，',
+  '   仅写入本插件本地数据（data/user.json），用于水鱼授权与查询。',
+].join('\n')
+
 function divingfishAuthorizeMsg(cfg, authorization) {
   return [
     '请完成水鱼查分器授权：',
@@ -139,6 +146,7 @@ export class MaiBind extends plugin {
       rule: [
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`, fnc: 'bindLxnsCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`, fnc: 'bindDfCmd' },
+        { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`, fnc: 'bindQqCmd' },
         { reg: `^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`, fnc: 'switchSource' },
         { reg: `^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`, fnc: 'switchTheme' },
       ],
@@ -189,6 +197,39 @@ export class MaiBind extends plugin {
       logger.warn(`[mai-plugin] 水鱼授权发起失败：${error?.name || error?.message}`)
       await this.reply(DIVINGFISH_BIND_FAILED_MSG, true)
     }
+    return true
+  }
+
+  /** #mai bind qq <QQ号>：官方QQBot(openid) 环境主动补充游戏 QQ（解锁水鱼）；bind qq clear 解除 */
+  async bindQqCmd(e) {
+    const args = ((e.msg.match(REG_BIND_QQ()) || [])[1] || '').trim()
+    const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
+    if (!got) return true
+    // OneBot 环境用户键本身即 QQ，无需也无法被覆盖（防冒用他人 QQ 查询）
+    if (/^\d+$/.test(got.user.key)) {
+      await this.reply('当前环境可直接读取 QQ 号，无需补充绑定。', true)
+      return true
+    }
+    if (!args) {
+      await this.reply(BIND_QQ_HELP, true)
+      return true
+    }
+    if (['clear', '解除', '解绑', '清除'].includes(args.toLowerCase())) {
+      database.updateUser(got.user.key, { qqid: null })
+      await this.reply('已解除游戏 QQ 绑定，水鱼查分器功能将不可用（可随时重新 bind qq 补充）。', true)
+      return true
+    }
+    if (!/^\d{5,12}$/.test(args)) {
+      await this.reply(`QQ 号格式不正确，请发送 5~12 位数字。\n${BIND_QQ_HELP}`, true)
+      return true
+    }
+    const qq = Number(args)
+    database.updateUser(got.user.key, { qqid: qq })
+    await this.reply(
+      `已绑定游戏 QQ「${qq}」。\n` +
+      '※ 官方QQBot 环境无法自读 QQ 号，水鱼查分器现在起可用：发送「#mai bind df」完成授权后即可查分。',
+      true,
+    )
     return true
   }
 

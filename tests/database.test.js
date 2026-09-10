@@ -64,6 +64,16 @@ test('openid（官方QQBot）用户键：非数字键原样存储且不落 qqid'
   // 重启后两者都还在
   await database.load()
   assert.equal(database.getUser(openid).accessToken, 'tok')
+
+  // 官方QQBot 用户主动补充游戏 QQ（#mai bind qq）——显式数字应保留
+  database.updateUser(openid, { qqid: 114514 })
+  assert.equal(database.getUser(openid).qqid, 114514)
+  // 清除（bind qq clear）——显式 null 应删除且不被磁盘旧值回带
+  database.updateUser(openid, { qqid: null, theme: 'circle' })
+  assert.equal(database.getUser(openid).qqid, undefined)
+  await database.load() // 重新读盘：磁盘亦已清除
+  assert.equal(database.getUser(openid).qqid, undefined)
+  assert.equal(database.getUser(openid).theme, 'circle')
 })
 
 test('写盘安全：外部新写入（如真机 401 刷新）不被内存旧快照回退', async () => {
