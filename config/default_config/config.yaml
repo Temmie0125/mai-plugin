@@ -18,6 +18,12 @@ aliasPush: true
 saveInMemory: true
 # 在线素材回退：本地缺失的曲绘/切图尝试从在线源获取
 assetsOnline: true
+# 静态资源包仓库地址（主人执行 #mai download 时拉取）
+# 国内直连 GitHub 不畅时，可直接改填代理前缀地址，例如：
+#   https://gh-proxy.com/https://github.com/Temmie0125/mai-plugin-resource-static.git
+assetsRepo: 'https://github.com/Temmie0125/mai-plugin-resource-static.git'
+# 自动更新资源：插件更新（#mai 更新）成功后，自动检查并更新静态资源包
+autoUpdateAssets: true
 
 # ===== 水鱼查分器（Diving-Fish） =====
 # 使用代理服务器访问水鱼查分器 API

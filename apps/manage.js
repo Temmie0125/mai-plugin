@@ -1,16 +1,19 @@
 /**
- * #mai 更新 / 强制更新（仅主人，参照 phi-plugin apps/update.js 范式精简实现）
+ * #mai 更新 / 强制更新 / download（仅主人，参照 phi-plugin apps/update.js 范式精简实现）
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  * - 普通更新：git pull --no-rebase（本地改动冲突时报错并引导强制更新）
  * - 强制更新：fetch --all --prune → reset --hard origin/main → clean（保留静态资源/数据/用户配置）
+ * - 下载资源：静态资源包 clone/update（详见 lib/resourcePack.js），
+ *   对应 phi 的「下载曲绘」；插件更新后按 autoUpdateAssets 自动跟进，对应 autoPullPhiIll
  * - 更新成功回最近提交日志；git/remote 缺失给中文引导；执行中防重入
  * 提示：本仓库已配置 origin（https://github.com/Temmie0125/mai-plugin.git）
  */
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import plugin from '../../../lib/plugins/plugin.js'
-import { head } from '../lib/config.js'
-import { pluginRoot } from '../lib/path.js'
+import Config, { head } from '../lib/config.js'
+import { pluginRoot, staticRoot } from '../lib/path.js'
+import { syncAssets, hasGit } from '../lib/resourcePack.js'
 
 const execAsync = promisify(exec)
 const REPO_URL = 'https://github.com/Temmie0125/mai-plugin'
@@ -21,6 +24,8 @@ const CLEAN_KEEP = ['resources/static', 'data', 'config/config', 'tests', 'temp'
 const H = () => head()
 
 let updating = false
+/** 资源包同步锁：与 updating 分开——资源包与插件是两个仓库，且插件更新后的自动同步不能撞上自己的锁 */
+let syncingRes = false
 
 function shellPath(p) {
   return `"${p.replace(/\\/g, '/').replace(/"/g, '\\"')}"`
@@ -40,6 +45,9 @@ export class MaiManage extends plugin {
       priority: 100,
       rule: [
         { reg: `^[#/]${H()}\\s*(强制)?\\s*(?:更新|gx)\\s*$`, fnc: 'update' },
+        // 资源包单独一条：带后缀的「更新资源/更新曲绘」不会被上面的更新规则吃掉，
+        // 而 #mai sync 两条都不命中（同步曲库属 P3，见 docs/P3实施文档.md §3.5）
+        { reg: `^[#/]${H()}\\s*(?:[Dd]ownload|[Dd]ownill|下载资源|下载|更新资源|更新曲绘)\\s*$`, fnc: 'downRes' },
       ],
     })
   }
@@ -110,6 +118,7 @@ export class MaiManage extends plugin {
     if (/Already up[ -]to[ -]date|已经是最新的/i.test(ret)) {
       const time = await this.lastCommitTime()
       await this.reply(`插件已经是最新版本\n最后提交时间：${time}`, true)
+      await this.autoSyncAssets()
       return true
     }
 
@@ -119,7 +128,72 @@ export class MaiManage extends plugin {
       await this.commitLogs(oldCommit, e)
     }
     await this.reply('更新完成。若修改涉及命令/启动逻辑，请重启 Bot 生效（宿主热更不保证覆盖）。', true)
+    await this.autoSyncAssets()
     return true
+  }
+
+  /** #mai download / 下载资源 / 更新资源：下载或更新静态资源包 */
+  async downRes(e) {
+    if (!e.isMaster) {
+      await this.reply('该指令仅主人可用', true)
+      return true
+    }
+    if (syncingRes) {
+      await this.reply('资源更新已在执行中，请勿重复操作', true)
+      return true
+    }
+    if (!(await hasGit())) {
+      await this.reply('未检测到 git，请先安装 git 后重试', true)
+      return true
+    }
+
+    await this.reply('开始下载/更新静态资源包，请稍候…（约 600MB，首次较慢）', true)
+    await this.syncResourcePack()
+    return true
+  }
+
+  /** 插件更新成功后按配置自动跟进资源包（对应 phi 的 autoPullPhiIll，默认开启） */
+  async autoSyncAssets() {
+    if (!Config.getUserCfg('config', 'autoUpdateAssets')) return
+    if (!(await hasGit())) return
+    await this.reply('按「自动更新资源」配置检查静态资源包…', true)
+    await this.syncResourcePack()
+  }
+
+  /**
+   * 资源包同步执行体（命令与自动跟进共用）
+   * 失败一律转中文回执、不向上冒泡，避免中断调用方（插件更新）的后续流程
+   * @param {string} [dir] 资源包目录，默认 resources/static（测试注入临时目录用）
+   */
+  async syncResourcePack(dir = staticRoot) {
+    syncingRes = true
+    let r
+    try {
+      r = await syncAssets({ dir })
+    } catch (error) {
+      await this.reply(this.gitErrText(error, '资源包'), true)
+      return
+    } finally {
+      syncingRes = false
+    }
+
+    // 远端为空：clone 会成功但拿不到任何提交（见 lib/resourcePack.js 的 empty 说明）
+    if (r.empty) {
+      await this.reply(`远程资源仓库还没有 main 分支（资源尚未推送）。\n仓库地址：${r.url}`, true)
+      return
+    }
+    if (!r.changed) {
+      await this.reply(`静态资源包已是最新（曲绘 ${r.covers.after} 张）`, true)
+      return
+    }
+
+    const verb = r.action === 'clone' ? '下载' : '更新'
+    const added = r.covers.after - r.covers.before
+    await this.reply(
+      `静态资源包${verb}完成：曲绘 ${r.covers.before} → ${r.covers.after} 张（${added >= 0 ? '+' : ''}${added}）\n`
+      + `耗时 ${(r.elapsedMs / 1000).toFixed(1)} 秒，资源来源 ${r.url}`,
+      true,
+    )
   }
 
   async lastCommitTime() {
@@ -163,15 +237,26 @@ export class MaiManage extends plugin {
     }
   }
 
-  /** 更新失败中文分流（参照 phi-plugin gitErr 精简） */
-  gitErrText(error) {
+  /**
+   * 更新失败中文分流（参照 phi-plugin gitErr 精简；插件更新与资源包同步共用）
+   * @param {Error} error
+   * @param {'插件'|'资源包'} what 失败主体——两者的补救手段不同（插件可强制更新，资源包只能换源/重试）
+   */
+  gitErrText(error, what = '插件') {
     const msg = error?.message || String(error)
-    const out = '插件更新失败：'
+    const out = `${what}更新失败：`
+    const isPlugin = what === '插件'
+    // 资源仓库推送前的首跑路径：远端无 main 分支
+    if (/couldn't find remote ref|Remote branch .+ not found|empty repository/i.test(msg)) {
+      return `${out}远程仓库还没有 main 分支（仓库为空或资源尚未推送）。\n请先向资源仓库推送内容，或改用其它地址（配置项 assetsRepo）。`
+    }
     if (/Timed out|Failed to connect|unable to access|Could not resolve/i.test(msg)) {
-      return `${out}连接远程仓库失败（超时或网络不通）。\n可稍后重试，或使用「#mai 强制更新」。`
+      return `${out}连接远程仓库失败（超时或网络不通）。\n可稍后重试`
+        + (isPlugin ? '，或使用「强制更新」。' : '；GitHub 直连不畅时可把 assetsRepo 改填代理前缀地址。')
     }
     if (/be overwritten by merge|CONFLICT|Your local changes/i.test(msg)) {
-      return `${out}存在本地改动冲突：\n${msg.slice(0, 400)}\n可放弃本地改动执行「#mai 强制更新」，或手动解决冲突。`
+      return `${out}存在本地改动冲突：\n${msg.slice(0, 400)}\n`
+        + (isPlugin ? '可放弃本地改动执行「强制更新」，或手动解决冲突。' : '请先手动处理 resources/static 内的冲突。')
     }
     if (/no remote|without a remote|repository .* does not exist|not a git repository/i.test(msg)) {
       return `${out}git 仓库/远程异常：\n${msg.slice(0, 300)}`

@@ -51,7 +51,15 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 ### 2. 静态资源包（必需，约 600MB，不入 git 仓库）
 
-资源根固定为 `plugins/mai-plugin/resources/static/`，二选一：
+资源根固定为 `plugins/mai-plugin/resources/static/`。**首选途径**是装好插件后由主人（超级用户）执行：
+
+```
+#mai download      # 或 #mai 下载资源
+```
+
+首次执行自动克隆资源仓库 `https://github.com/Temmie0125/mai-plugin-resource-static.git`；之后再次执行即为**增量更新**（已是最新会直接回执，不会重复下载）。若 `resources/static/` 下已手工放好资源包（下方两条迁移途径），命令会**就地接管**该目录、只补差异，不会重下 600MB；目录内的 `data/` 不会被清除，迁移用户的 `user.db` 与曲库缓存均保留。
+
+也可以先手工放好资源包、再执行一次 `#mai download` 接管：
 
 - **老用户（从 NoneBot 版迁移）**：把 NoneBot 资源包 `static/` 目录**整体复制**过来：
 
@@ -63,27 +71,47 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 - **新用户**：下载静态资源包压缩包（请前往[源项目主页](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)进行下载），解压到 `plugins/mai-plugin/resources/`，保证目录结构为 `resources/static/mai/...`。
 
+国内直连 GitHub 不畅时，把配置项 `assetsRepo` 改填代理前缀地址即可，例如 `https://gh-proxy.com/https://github.com/Temmie0125/mai-plugin-resource-static.git`。
+
 启动时自动检测：曲绘数 < 500 会红字告警并引导。缺失单项素材渲染时在线回退（可配 `assetsOnline`）。
 
 ## 配置
 
 首次启动自动从 `config/default_config/` 生成 `config/config/` 用户副本：
 
-- `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数等，修改后重启生效；
+- `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数、静态资源包地址与自动更新（`assetsRepo` / `autoUpdateAssets`）等，修改后重启生效；
 - `banGroup.yaml`：封禁群列表。
 
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。
+
+> [!NOTE]
+> 使用水鱼 OAuth 绑定时，用户发送 `#mai bind df`，BOT 会返回一条授权链接，用户打开并确认页面上显示的绑定身份后点击「同意授权」即可，**不需要把授权码回贴给 BOT**。绑定关系与授权范围保存在水鱼服务端，BOT只保管应用凭据，不保存任何用户令牌；用户可随时在 https://auth.diving-fish.com/apps 撤销授权。未绑定的用户仍可使用 `#mai b50` 指令。
+
+> [!WARNING]
+> 开发者 token 已被水鱼查分器弃用：它能按 QQ 号读取任意用户的成绩，用户从未对 BOT 做过授权，也无法撤销。水鱼已停止签发新的开发者 token，并将在过渡期后关闭该鉴权方式。请申请 OAuth 应用并配置 `dfClientId` 与 `dfClientSecret`。
+> 您在申请水鱼 OAuth 应用时，请至少申请「读取你在查分器的资料」和「读取你的舞萌 DX 成绩的权重」两项权限。权限不足本插件对应功能将无法工作。
+
+> [!NOTE]
+> 使用落雪 OAuth 绑定时，可在群聊或私聊发送 `#mai bind lxns`，按提示完成授权后发送授权码或完整回调链接；群聊发起的绑定也可以转到同一 Bot 的私聊完成。若设置 `lxnsBindPrivateOnly=true`，群聊只会提示用户添加 Bot 好友后前往私聊。部分 OneBot 实现无法接收陌生人的私聊消息，因此该选项默认关闭。
+> 您在申请落雪 OAuth 应用时，OAuth 权限范围请选择前三项，不包括「读取个人API秘钥」。权限不足本插件对应功能将无法工作。
+
+> [!NOTE]
+> 插件带有别名更新推送功能，默认关闭全部群组推送，仅白名单群聊会启用。如有需要请在对应群内使用指令 `#mai alias push on`（需要管理员权限）。
+
 
 ## 插件更新
 
 仓库已内置 git 远程（`https://github.com/Temmie0125/mai-plugin`）。主人（超级用户）发送：
 
 - `#mai 更新`：`git pull` 拉取远端更新（本地改动冲突时引导强制更新）；
-- `#mai 强制更新`：`git fetch --all --prune` → `reset --hard origin/main` → `clean`，**放弃本地未提交改动**（自动保留 `resources/static/`、`data/`、`config/config/`、`tests/` 等运行产物与用户数据）。
+- `#mai 强制更新`：`git fetch --all --prune` → `reset --hard origin/main` → `clean`，**放弃本地未提交改动**（自动保留 `resources/static/`、`data/`、`config/config/`、`tests/` 等运行产物与用户数据）；
+- `#mai download` / `#mai 下载资源`：单独下载或更新静态资源包（即下面自动跟进的那一步，可随时手动执行）。
+
+插件更新成功后会按配置项 `autoUpdateAssets`（默认**开启**）自动检查并更新静态资源包——等同 phi-plugin 更新插件时自动拉曲绘。不需要可在锅巴面板或 `config/config/config.yaml` 里关掉。
 
 更新成功会回执最近提交日志；涉及命令/启动逻辑的改动需**重启 Bot** 生效。
 
-自定义分发：改仓库 remote 即可 `git remote set-url origin <你的仓库地址>`。
+自定义分发：改仓库 remote 即可 `git remote set-url origin <你的仓库地址>`；资源包地址同理，改配置项 `assetsRepo`。
 
 ## 运行数据
 

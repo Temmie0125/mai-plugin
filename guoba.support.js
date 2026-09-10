@@ -68,6 +68,19 @@ export function supportGuoba() {
           component: 'Switch',
         },
         {
+          field: 'autoUpdateAssets',
+          label: '自动更新资源',
+          bottomHelpMessage: '开启后执行「插件更新」时自动检查并更新静态资源包',
+          component: 'Switch',
+        },
+        {
+          field: 'assetsRepo',
+          label: '资源仓库地址',
+          bottomHelpMessage: '静态资源包的 git 地址；国内直连 GitHub 不畅时可填代理前缀地址，'
+            + '如 https://gh-proxy.com/https://github.com/Temmie0125/mai-plugin-resource-static.git',
+          component: 'Input',
+        },
+        {
           field: 'renderQuality',
           label: '截图质量',
           bottomHelpMessage: '截图 jpeg 质量',

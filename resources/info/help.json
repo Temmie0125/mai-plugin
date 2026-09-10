@@ -218,6 +218,11 @@
         "desc": "放弃本地改动强制更新（仅主人）"
       },
       {
+        "title": "download",
+        "eg": "#{head} download",
+        "desc": "下载/更新静态资源包（仅主人，同「下载资源」）"
+      },
+      {
         "title": "sync",
         "eg": "#{head} sync",
         "desc": "同步曲库/别名/牌子数据（管理员私聊）"

@@ -42,8 +42,8 @@ const ready = checkReadiness()
 if (!ready.ready) {
   logger.error(
     `[mai-plugin] 静态资源包缺失或曲绘不足（${ready.count}/500+），` +
-      '请将 NoneBot 资源包 static/ 整体复制到 plugins/mai-plugin/resources/static/，' +
-      '或按 README 下载资源包解压。'
+      `请由主人执行「#${Config.getUserCfg('config', 'cmdhead')} download」自动下载，` +
+      '或把 NoneBot 资源包 static/ 整体复制到 plugins/mai-plugin/resources/static/。'
   )
 } else {
   logger.mark(`[mai-plugin] 静态资源就绪：曲绘 ${ready.count} 张`)

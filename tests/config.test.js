@@ -9,6 +9,12 @@ test('出厂默认配置可读且关键 key 存在', () => {
   assert.equal(typeof def.aliasPush, 'boolean')
 })
 
+test('静态资源项：仓库地址有出厂默认，自动更新默认开启', () => {
+  const def = Config.getdefSet('config')
+  assert.equal(def.assetsRepo, 'https://github.com/Temmie0125/mai-plugin-resource-static.git')
+  assert.equal(def.autoUpdateAssets, true)
+})
+
 test('用户副本 yaml 已自动生成（initCfg 复制）', () => {
   const user = Config.getUserCfg('config')
   assert.equal(user.cmdhead, 'mai')
