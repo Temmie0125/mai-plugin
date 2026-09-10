@@ -79,7 +79,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 首次启动自动从 `config/default_config/` 生成 `config/config/` 用户副本：
 
-- `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数、静态资源包地址与自动更新（`assetsRepo` / `autoUpdateAssets`）等，修改后重启生效；
+- `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数、静态资源包地址与自动更新（`assetsRepo` / `autoUpdateAssets`）、每日自动同步（`autoSync` / `autoSyncTime`）等，修改后重启生效；
 - `banGroup.yaml`：封禁群列表。
 
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。
@@ -116,8 +116,13 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 ## 运行数据
 
 - `data/user.json`：用户绑定与主题（自 NoneBot 版 `user.db` JSON 化）；
-- `data/group.json`：群开关（猜歌 / 别名推送）；
+- `data/group.json`：群开关（猜歌 / 别名推送，**默认全关**，白名单语义——只有显式开过的群才生效）；
 - `data/music/`：曲库/别名/牌子运行时缓存（`#mai sync` 重建）。
+
+曲库默认**每日 05:30 自动同步**一次。主人可随时用 `#mai sync`（别名 `更新曲库` / `数据更新`）手动同步；不需要自动同步就把配置项 `autoSync` 关掉，改为纯手动。
+
+> [!IMPORTANT]
+> 若在宿主 `config/config/bot.yaml` 里启用了**定时更新**（`update_cron`）或**间隔更新**（`update_time`），请把本插件的 `autoSyncTime` 与之**错开**，避免同步进行到一半被宿主重启打断。特别注意 `update_time` 是「启动后 N 分钟」的间隔模式，触发时刻**不可预测**，靠挑时间躲不掉——因此本插件的写盘一律采用**原子替换**（先写 `.tmp` 再 rename），被任何来源的重启打断都不会留下截断的缓存文件。
 
 ## 美术与版权声明（必读）
 

@@ -180,6 +180,22 @@ export function supportGuoba() {
           component: 'InputNumber',
           componentProps: { min: 5, max: 50 },
         },
+        { label: '定时', component: 'SOFT_GROUP_BEGIN' },
+        {
+          field: 'autoSync',
+          label: '每日自动同步曲库',
+          bottomHelpMessage: '关闭后仍可随时由主人用「#mai sync」手动同步；改动需重启生效',
+          component: 'Switch',
+        },
+        {
+          // 刻意用 Input 而非 TimePicker：TimePicker 的值类型是 Date/数组，与 yaml 里的 '05:30' 字符串
+          // 不一致，会静默写坏配置（本仓 schema 至今只用过 Input/Switch/InputNumber）
+          field: 'autoSyncTime',
+          label: '自动同步时间',
+          bottomHelpMessage: 'HH:MM（本地时区，如 05:30 或 5:30），改动需重启生效；'
+            + '默认 05:30 避开常见的 04:00–04:30 更新窗口，非法值会回退默认并告警',
+          component: 'Input',
+        },
       ],
       // 读取/写回当前配置（键与 yaml 一一对应）
       getConfigData() {

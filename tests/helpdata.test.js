@@ -10,6 +10,8 @@ test('帮助数据：{head} 占位符替换为当前命令头', () => {
   for (const item of all) {
     assert.ok(!item.title.includes('{head}'), 'title 不应残留占位符')
     assert.ok(!item.eg.includes('{head}'), 'eg 不应残留占位符')
+    // desc 也必须替换：漏掉会把字面量 {head} 印到帮助图上（fsline 条目曾如此）
+    assert.ok(!String(item.desc ?? '').includes('{head}'), `desc 不应残留占位符：${item.title}`)
   }
   assert.ok(all.some(i => i.eg.includes('#maidx')), '示例应包含新命令头')
 })

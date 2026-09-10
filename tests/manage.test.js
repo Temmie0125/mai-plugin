@@ -62,7 +62,7 @@ function rulesOf(cls) {
 
 test('更新规则：命中样例（普通/强制/别名/双前缀）', () => {
   const rules = rulesOf(MaiManage)
-  assert.equal(rules.length, 2, '插件更新 + 资源下载两条规则')
+  assert.equal(rules.length, 3, '插件更新 + 资源下载 + 曲库同步三条规则')
   const reg = rules[0].reg
   for (const msg of ['#mai 更新', '#mai 强制更新', '#mai gx', '#mai   强制   更新']) {
     assert.match(msg, reg, `应命中：${msg}`)
@@ -95,11 +95,44 @@ test('资源规则：命中样例（英文/中文/不分大小写）', () => {
   }
 })
 
-test('资源规则：拒收样例（尤其不与插件更新互吃、sync 属 P3 不命中）', () => {
+test('资源规则：拒收样例（尤其不与插件更新互吃）', () => {
   const reg = rulesOf(MaiManage)[1].reg
   for (const msg of ['#mai 更新', '#mai 强制更新', '#mai gx', '#mai sync', '#maix download',
-    'mai download', '#phi download', '#mai download 曲绘']) {
+    'mai download', '#phi download', '#mai download 曲绘', '#mai 更新曲库']) {
     assert.doesNotMatch(msg, reg, `不应命中：${msg}`)
+  }
+})
+
+test('同步规则：命中样例（英文/中文别名/双前缀）', () => {
+  const rules = rulesOf(MaiManage)
+  assert.equal(rules[2].fnc, 'syncMusic')
+  const reg = rules[2].reg
+  for (const msg of ['#mai sync', '/mai sync', '#mai   sync ', '#mai 更新曲库', '#mai 数据更新']) {
+    assert.match(msg, reg, `应命中：${msg}`)
+  }
+})
+
+test('同步规则：拒收样例（刻意避开 update 一词，且三条规则互不吃）', () => {
+  const reg = rulesOf(MaiManage)[2].reg
+  for (const msg of ['#mai 更新', '#mai 强制更新', '#mai gx', '#mai update', '/mai update',
+    '#mai download', '#mai 下载资源', '#mai 更新资源', '#mai 更新曲绘',
+    '#maix sync', 'mai sync', '#phi sync', '#mai 同步曲库']) {
+    assert.doesNotMatch(msg, reg, `不应命中：${msg}`)
+  }
+})
+
+test('三条规则两两互斥：每条样例只被一条命中', () => {
+  const rules = rulesOf(MaiManage)
+  const samples = {
+    update: ['#mai 更新', '#mai 强制更新', '#mai gx'],
+    downRes: ['#mai download', '#mai 下载资源', '#mai 更新资源'],
+    syncMusic: ['#mai sync', '#mai 更新曲库', '#mai 数据更新'],
+  }
+  for (const [owner, msgs] of Object.entries(samples)) {
+    for (const msg of msgs) {
+      const hit = rules.filter(r => r.reg.test(msg)).map(r => r.fnc)
+      assert.deepEqual(hit, [owner], `${msg} 应只被 ${owner} 命中，实际 ${JSON.stringify(hit)}`)
+    }
   }
 })
 

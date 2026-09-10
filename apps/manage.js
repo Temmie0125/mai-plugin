@@ -5,6 +5,7 @@
  * - 强制更新：fetch --all --prune → reset --hard origin/main → clean（保留静态资源/数据/用户配置）
  * - 下载资源：静态资源包 clone/update（详见 lib/resourcePack.js），
  *   对应 phi 的「下载曲绘」；插件更新后按 autoUpdateAssets 自动跟进，对应 autoPullPhiIll
+ * - 同步曲库：`#mai sync` 与每日定时 task 共用 lib/sync.js 的同一把锁（P3 实施文档 §3）
  * - 更新成功回最近提交日志；git/remote 缺失给中文引导；执行中防重入
  * 提示：本仓库已配置 origin（https://github.com/Temmie0125/mai-plugin.git）
  */
@@ -14,6 +15,10 @@ import plugin from '../../../lib/plugins/plugin.js'
 import Config, { head } from '../lib/config.js'
 import { pluginRoot, staticRoot } from '../lib/path.js'
 import { syncAssets, hasGit } from '../lib/resourcePack.js'
+import { syncMusicData, isSyncing } from '../lib/sync.js'
+import { resolveAutoSyncCron } from '../lib/schedule.js'
+import { handleErrors } from '../lib/handlerError.js'
+import { mai } from '../lib/service.js'
 
 const execAsync = promisify(exec)
 const REPO_URL = 'https://github.com/Temmie0125/mai-plugin'
@@ -45,11 +50,92 @@ export class MaiManage extends plugin {
       priority: 100,
       rule: [
         { reg: `^[#/]${H()}\\s*(强制)?\\s*(?:更新|gx)\\s*$`, fnc: 'update' },
-        // 资源包单独一条：带后缀的「更新资源/更新曲绘」不会被上面的更新规则吃掉，
-        // 而 #mai sync 两条都不命中（同步曲库属 P3，见 docs/P3实施文档.md §3.5）
+        // 资源包单独一条：带后缀的「更新资源/更新曲绘」不会被上面的更新规则吃掉
         { reg: `^[#/]${H()}\\s*(?:[Dd]ownload|[Dd]ownill|下载资源|下载|更新资源|更新曲绘)\\s*$`, fnc: 'downRes' },
+        // 同步曲库（P3 §3.5）：刻意避开 update 一词——phi 的 #phi update 是「用户拉自己的成绩」，
+        // 同宿主共存时语义会混。三条规则互不吃，由 tests/manage.test.js 锁定。
+        { reg: `^[#/]${H()}\\s*(?:sync|更新曲库|数据更新)\\s*$`, fnc: 'syncMusic' },
       ],
     })
+  }
+
+  /**
+   * 定时任务装配点（宿主 loader 先跑 init 再 collectTask，且此刻配置才可读）。
+   * init() 只在插件加载时跑一次 ⇒ 配置改动天然「重启生效」，正是本项目要的语义。
+   * 宿主 plugin.js 已给 this.task 赋了 `{name:'',fnc:'',cron:''}` 占位，而 collectTask 判的是
+   * `if (i.cron && i.fnc)`（空串为假）⇒ autoSync 关闭时不覆盖即天然不注册。
+   */
+  async init() {
+    const cfg = Config.getUserCfg('config')
+    if (!cfg.autoSync) return // 不覆盖 this.task 的占位对象 ⇒ collectTask 不注册
+    const { cron, time, fallback } = resolveAutoSyncCron(cfg.autoSyncTime)
+    if (fallback) {
+      logger?.error?.(
+        `[mai-plugin] autoSyncTime 非法：${JSON.stringify(cfg.autoSyncTime)}，已回退默认 ${time}`,
+      )
+    }
+    this.task = { name: 'mai-plugin-曲库同步', cron, fnc: () => this.autoSync(), log: false }
+    // 成功路径不在这里打日志：index.js 的启动块已统一打印实际生效的同步计划（P3 §10.3），
+    // 两处都打会让启动日志出现两行几乎相同的内容
+  }
+
+  /** #mai sync / 更新曲库 / 数据更新 —— 全量同步曲库/别名/牌子（仅主人） */
+  async syncMusic(e) {
+    if (!e.isMaster) {
+      await this.reply('该指令仅主人可用', true)
+      return true
+    }
+    if (isSyncing()) {
+      await this.reply('正在同步中，请稍候', true)
+      return true
+    }
+
+    await this.reply('正在同步曲库…', true)
+    // handleErrors：成功返回原值，失败返回可发送的中文文案（lib/handlerError.js）
+    const r = await handleErrors(() => syncMusicData())
+    if (typeof r === 'string') {
+      await this.reply(r, true)
+      return true
+    }
+    if (r?.busy) {
+      await this.reply('正在同步中，请稍候', true)
+      return true
+    }
+    await this.reply(
+      `曲库/别名/牌子同步完成（曲库 ${mai.totalList.root.length} 曲 / 别名 ${mai.totalAliasList.root.length} 条）`,
+      true,
+    )
+    return true
+  }
+
+  /**
+   * 每日定时任务入口（宿主 task 的 fnc 不带任何参数，故无 `e`）
+   * 忙则跳过本轮并记日志；失败记日志并通知主人——每日数据刷新静默失败是运维陷阱。
+   */
+  async autoSync() {
+    const busy = () => logger?.mark?.('[mai-plugin] 曲库同步进行中，跳过本轮定时同步')
+    if (isSyncing()) {
+      busy()
+      return
+    }
+    try {
+      const r = await syncMusicData()
+      if (r?.busy) {
+        busy()
+        return
+      }
+      logger?.mark?.(
+        `[mai-plugin] 定时同步完成：曲库 ${mai.totalList.root.length} 曲 / 别名 ${mai.totalAliasList.root.length} 条`,
+      )
+    } catch (error) {
+      const msg = error?.message || String(error)
+      logger?.error?.('[mai-plugin] 定时同步曲库失败：', msg)
+      try {
+        await globalThis.Bot?.sendMasterMsg?.(
+          `[mai-plugin] 每日自动同步曲库失败：${msg}\n可发送「#mai sync」手动重试。`,
+        )
+      } catch { /* 通知失败不影响任务本身 */ }
+    }
   }
 
   /** #mai 更新 / #mai 强制更新 */

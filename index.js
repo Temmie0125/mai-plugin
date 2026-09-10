@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import Config from './lib/config.js'
 import * as database from './lib/database.js'
 import { checkReadiness } from './lib/render/assets.js'
+import { resolveAutoSyncCron } from './lib/schedule.js'
 import { mai } from './lib/service.js'
 import pkg from './package.json' with { type: 'json' }
 const { version } = pkg
@@ -64,6 +65,22 @@ if (cfg.aliasPush) {
   logger.mark('[mai-plugin] 别名推送为「开启」状态')
 } else {
   logger.warn('[mai-plugin] 别名推送为「关闭」状态')
+}
+
+// 4.2) 每日同步计划（P3 实施文档 §10.3）：把**实际生效值**打出来，运维一眼可见；
+// 配置非法时用黄字告警说明已回退，避免「以为配了 03:00 其实跑在 05:30」这类静默偏差
+if (!cfg.autoSync) {
+  logger.mark('[mai-plugin] 每日自动同步曲库：已关闭（可随时用「#mai sync」手动同步）')
+} else {
+  const { time, fallback } = resolveAutoSyncCron(cfg.autoSyncTime)
+  if (fallback) {
+    logger.warn(
+      `[mai-plugin] autoSyncTime 非法：${JSON.stringify(cfg.autoSyncTime)}，` +
+        `已回退默认 ${time}（改动需重启生效）`
+    )
+  } else {
+    logger.mark(`[mai-plugin] 每日自动同步曲库：${time}`)
+  }
 }
 
 // 5) 动态加载 apps/（phi-plugin index.js 范式；类实例化两次，构造器保持幂等）
