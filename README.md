@@ -1,10 +1,20 @@
-# mai-plugin
-
-<p align="center">
+<div align="center">
   <img src="resources/icons/plugin_icon.png" width="128" alt="mai-plugin">
-  <p align="center">TRSS-Yunzai 舞萌DX插件
-  </p>
-</p>
+  <h3>TRSS-Yunzai 舞萌DX插件
+  </h3>
+
+<img alt="GitHub issues" src="https://img.shields.io/github/issues/Temmie0125/mai-plugin?style=flat-square"/>
+<img alt="GitHub license" src="https://img.shields.io/github/license/Temmie0125/mai-plugin?style=flat-square"/>
+<img alt="GitHub stars" src="https://img.shields.io/github/stars/Temmie0125/mai-plugin?style=social"/>
+
+[![version](https://img.shields.io/badge/插件版本-0.1.0-9cf?style=flat-square)](./)
+[![version](https://img.shields.io/badge/舞萌DX-2026-9cf?style=flat-square)](./)
+[![TrssYunzai](https://img.shields.io/badge/TRSS--Yunzai-v3.0-9cf?style=flat-square&logo=dependabot)](../../TimeRainStarSky/Yunzai)
+
+
+</div>
+
+## 简介
 
 TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）开源项目，按 Yunzai 生态习惯本地化重写。
 
