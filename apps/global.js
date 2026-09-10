@@ -6,7 +6,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import { head } from '../lib/config.js'
 import {
-  FSLINE_FORMAT_ERROR, FSLINE_HELP, drawSongGlobalData, fslineText, getRatingRanking,
+  FSLINE_FORMAT_ERROR, FSLINE_HELP, drawFsline, drawSongGlobalData, fslineText, getRatingRanking,
   myRatingRankingText, rankListText, rankNameText,
 } from '../lib/handler.js'
 import { toSegment } from '../lib/render/picmodle.js'
@@ -23,6 +23,37 @@ const REG_MYRANK = () => new RegExp(`^[#/]${H()}\\s*(?:myrank|我的排名)\\s*$
 const REG_FSLINE = () => new RegExp(`^[#/]${H()}\\s*(?:fsline|分数线)(?:\\s+(.+))?$`)
 
 const LEVEL_COLORS = '绿黄红紫白'
+
+/**
+ * 附加文本换算（`fslineText` 的容错包装）
+ * 源口径在 `brk == 0` 时退化为格式错误文案，此时**没必要再补一行**，故返回空串
+ */
+function fslineTextSafe(song, levelIndex, line) {
+  try {
+    const text = fslineText(song, levelIndex, line)
+    return text === FSLINE_FORMAT_ERROR ? '' : text
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * 解析分数线参数 `[难度色]<曲名|id|别名> [达成率]`（纯函数，便于单测）
+ *
+ * **达成率可选**：只有末尾 token 能 parse 成数字时才算它。海报四张表全部只由物量推出、
+ * 与达成率无关（见 lib/fsline.js），达成率仅驱动附加的那行文本。
+ * @param {string} raw 命令头之后、去掉首尾空白的整段
+ * @returns {{levelIndex:number, query:string, line:number|null}|null} 解析不出难度色+曲目时 null
+ */
+export function parseFslineArgs(raw) {
+  const args = String(raw ?? '').split(/\s+/).filter(Boolean)
+  if (!args.length) return null
+  const last = args[args.length - 1]
+  const hasLine = Number.isFinite(parseFloat(last))
+  const m = (hasLine ? args.slice(0, -1) : args).join(' ').match(/^([绿黄红紫白])\s*(.+)$/)
+  if (!m) return null
+  return { levelIndex: LEVEL_COLORS.indexOf(m[1]), query: m[2].trim(), line: hasLine ? parseFloat(last) : null }
+}
 
 export class MaiGlobal extends plugin {
   constructor() {
@@ -132,7 +163,8 @@ export class MaiGlobal extends plugin {
    * 与源的差异（设计 §3.2-19 + 用户拍板）：
    *  1. 源只认 `<难度色><纯数字id>`；此处把查曲扩展为与 song/score 同一管线（曲名/别名/id），
    *     多候选走既有 pickSong 引导；
-   *  2. 达成率仍取**最后一个 token**（源 `float(args[-1])`），难度色允许空格分隔（源靠 `\s?`）；
+   *  2. 达成率**可选**：取最后一个 token 且仅当它能 parse 成数字（海报四表与达成率无关，
+   *     见 lib/fsline.js）；难度色允许空格分隔（源靠 `\s?`）；
    *  3. 帮助为纯文本（源走 text_to_bytes_io 转图，设计 §6.4 已废除长文本转图）。
    */
   async fsline(e) {
@@ -145,14 +177,12 @@ export class MaiGlobal extends plugin {
       return true
     }
 
-    const line = parseFloat(args[args.length - 1])
-    const m = args.slice(0, -1).join(' ').match(/^([绿黄红紫白])\s*(.+)$/)
-    if (!m || !Number.isFinite(line)) {
+    const parsed = parseFslineArgs(raw)
+    if (!parsed) {
       await this.reply(FSLINE_FORMAT_ERROR, true)
       return true
     }
-    const levelIndex = LEVEL_COLORS.indexOf(m[1])
-    const query = m[2].trim()
+    const { levelIndex, query, line } = parsed
 
     // 纯数字 → id 直查（源的唯一形态）
     if (/^\d+$/.test(query)) {
@@ -180,13 +210,30 @@ export class MaiGlobal extends plugin {
     return true
   }
 
-  /** 分数线换算与回复（handleErrors 兜住 brk==0 退化等边界） */
-  async sendFsline(song, levelIndex, line) {
-    const text = await handleErrors(async () => {
-      if (levelIndex >= song.difficulties.length) return FSLINE_FORMAT_ERROR
-      return fslineText(song, levelIndex, line)
-    })
-    await this.reply(text, true)
+  /**
+   * 分数线回复：出海报（四表由物量推出，见 lib/fsline.js）
+   *
+   * - 给了达成率 ⇒ 图之外**再附一行**现有文本（`fslineText` 原样保留为附加信息）
+   * - 渲染失败 ⇒ 有达成率就退回只发文本；没有则把渲染错误亮出来（否则用户看不到任何反馈）
+   */
+  async sendFsline(song, levelIndex, line = null) {
+    if (levelIndex >= song.difficulties.length) {
+      await this.reply(FSLINE_FORMAT_ERROR, true)
+      return
+    }
+
+    const image = await drawFsline(song, levelIndex)
+    if (typeof image === 'string') {
+      const fallback = line == null ? image : fslineTextSafe(song, levelIndex, line)
+      await this.reply(fallback, true)
+      return
+    }
+    await this.reply(toSegment(image), true)
+
+    if (line != null) {
+      const text = fslineTextSafe(song, levelIndex, line)
+      if (text) await this.reply(text, true)
+    }
   }
 
   /** 多候选选曲上下文（§3.4） */

@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<!--
+  单曲分数线成图（prism_plus）
+  版式与算法均复用用户提供的样板「分数线成图(prism_plus).html」：
+  CSS 与 DOM 结构逐行移植，仅把相对资源路径换成 {{_staticPath}}、把样板里写死的 demo 值
+  换成 art-template 插值，并删掉样板末尾那四段自算脚本（算法已抽到 lib/fsline.js）。
+  ⚠️ 本模板**不吃** images[]/texts[] 那套视图约定：样板是多层边框 + CSS grid 的表格布局，
+  用 img()/txt() 表达会丢掉边框层与 grid 缝隙，故直接吃结构化数据。
+-->
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    width: 1400px;
+    height: 1600px;
+    background: #2a2a2a;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ===== 底板（改为相对路径） ===== */
+body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('{{_staticPath}}/mai/pic/prism_plus/b50.png') no-repeat center/cover;
+    z-index: 0;
+}
+
+.container {
+    width: 1400px;
+    height: 1600px;
+    position: relative;
+    z-index: 1;
+}
+
+/* ===== 主框体 ===== */
+.outer-wrapper {
+    position: absolute;
+    left: 130px;      
+    top: 70px;        
+    width: 1140px;    
+    height: 320px;    
+    background: transparent;
+    border-radius: 20px; 
+    box-sizing: border-box;
+    filter: drop-shadow(0px 8px 12px rgba(0, 0, 0, 0.50));
+}
+
+/* ===== 半透明白色遮罩 ===== */
+.white-mask {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.8); 
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.7);
+    z-index: 1;
+}
+
+/* ===== 外圈线条 ===== */
+.outer-lines {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    border: 1px solid #404040;
+    box-shadow: inset 0 0 0 2px #ffffff, inset 0 0 0 4px #7964B3, inset 0 0 0 5px #ffffff;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* ===== 最内层分色线框 ===== */
+.gradient-line {
+    position: absolute;
+    inset: 6px;
+    border-radius: 14px;
+    border: 3px solid transparent;
+    background: linear-gradient(to bottom, #D5AEFF 0%, #D5AEFF 50%, #FBF3B2 50%, #FBF3B2 100%) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* ===== 下方表格区外框（新增，不影响原有样式） ===== */
+.table-frame-outer {
+    position: absolute;
+    left: 130px;
+    top: 420px;
+    width: 1140px;
+    height: 140px;
+    border-radius: 10px;
+    background: transparent;
+    z-index: 4;
+    pointer-events: none;
+    box-shadow: 0px 8px 12px rgba(0, 0, 0, 0.50);
+}
+
+/* 层1：白色外圈 3px */
+.table-frame-outer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 3px solid #FFFFFF;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+/* 层2：内延 3px 的紫色线框，保证同心圆弧 */
+.table-frame-outer::after {
+    content: '';
+    position: absolute;
+    inset: 3px;              /* 内延 3px */
+    border-radius: 7px;      /* 10px - 3px = 7px，保持同心 */
+    border: 3px solid #8669D7;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+/* ===== 表格区内部：12 格（自定义行高列宽） ===== */
+.table-grid {
+    position: absolute;
+    left: 130px;
+    top: 420px;
+    width: 1140px;
+    height: 140px;
+    display: grid;
+    grid-template-columns: 174px 158px 158px 158px 158px 158px 164px;  /* 合计 1140px */
+    grid-template-rows: 60px 80px;                                /* 合计 140px */
+    gap: 2px;                    /* 紫色分隔线：缝隙 2px */
+    background: #8669D7;         /* 缝隙露出的颜色 = 紫色线 */
+    border-radius: 10px;         /* 与外框圆角一致 */
+    overflow: hidden;            /* 裁切到圆角内 */
+    z-index: 3;
+}
+
+/* 半透明白色遮罩（90% 白） */
+.cell-white {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.7);
+}
+
+/* 深紫色块 */
+.cell-purple {
+    background: #310080;
+}
+
+/* 基础：无背景（兜底） */
+.cell-dynamic {
+    background: #9B7EDE;   /* 默认紫色 */
+    color: #ffffff;
+}
+
+/* 各难度配色 */
+.cell-dynamic.dif-basic    { background: #3DAC1F; }   /* 绿 */
+.cell-dynamic.dif-advanced { background: #FFB600; }   /* 黄 */
+.cell-dynamic.dif-expert   { background: #FF6B64; }   /* 红 */
+.cell-dynamic.dif-master   { background: #9F50DB; }   /* 紫 */
+.cell-dynamic.dif-remaster { background: #E5E5E5; color: #440087; }   /* 白 */
+
+/* ===== 分数表外框 ===== */
+.score-frame-outer {
+    position: absolute;
+    left: 130px;
+    top: 590px;
+    width: 798px;
+    height: 500px;
+    border-radius: 10px;
+    background: transparent;
+    z-index: 4;
+    pointer-events: none;
+    box-shadow: 0px 8px 12px rgba(0, 0, 0, 0.50);
+    filter: none;
+}
+
+.score-frame-outer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 3px solid #FFFFFF;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.score-frame-outer::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 7px;
+    border: 3px solid #8669D7;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+/* ===== 分数表内部网格 ===== */
+.score-grid {
+    position: absolute;
+    left: 130px;
+    top: 590px;
+    width: 792px;
+    height: 302px;
+    display: grid;
+    grid-template-columns: 150px 210px 210px 216px;
+    grid-template-rows: 46px 62px 62px 62px 62px;
+    gap: 2px;
+    background: #8669D7;
+    border-radius: 10px 10px 0 0;
+    overflow: hidden;
+    z-index: 3;
+    /* 去掉 border-bottom */
+}
+
+.break-region {
+    position: absolute;
+    left: 130px;
+    top: 892px;
+    width: 792px;
+    height: 198px;
+    display: grid;
+    grid-template-columns: 150px 68px 140px 68px 140px 68px 146px;
+    grid-template-rows: 62px 62px 62px;
+    gap: 2px;
+    background: #8669D7;
+    border-top: 2px solid #8669D7;    /* 顶部分隔线 */
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+    box-sizing: border-box;
+    z-index: 3;
+}
+
+.break-region .sub {
+    background: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 20px;
+    color: #310080;
+    box-sizing: border-box;
+}
+
+/* BREAK 标签：跨 3 行 */
+.break-region .break-label {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    background: #310080;
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+/* 第 1~2 行：列4+列5 合并（跨 2 列 + 跨 2 行） */
+.break-region .merged-a {
+    grid-column: 4 / 6;
+    grid-row: 1 / 3;
+}
+
+/* 第 1~2 行：列6+列7 合并（跨 2 列 + 跨 2 行） */
+.break-region .merged-b {
+    grid-column: 6 / 8;
+    grid-row: 1 / 3;
+}
+
+/* ===== 分数表：格子基础底色 ===== */
+.score-grid .cell {
+    background: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 20px;
+    color: #310080;
+    box-sizing: border-box;
+}
+
+/* 第 1 行：极淡紫 */
+.score-grid .cell:nth-child(-n+4) {
+    background: #F7F1FF;
+}
+
+/* 第 1 列：除第 1 格外，暗紫 */
+.score-grid .cell:nth-child(4n+1):not(:first-child) {
+    background: #310080;
+    color: #FFFFFF;
+}
+
+/* ===== 等级表外框（与分数线表同款） ===== */
+.rank-frame-outer {
+    position: absolute;
+    left: 938px;
+    top: 590px;
+    width: 332px;
+    height: 500px;
+    border-radius: 10px;
+    background: transparent;
+    z-index: 4;
+    pointer-events: none;
+    box-shadow: 0px 8px 12px rgba(0, 0, 0, 0.50);
+}
+
+.rank-frame-outer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 3px solid #FFFFFF;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.rank-frame-outer::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 7px;
+    border: 3px solid #8669D7;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.rank-grid {
+    position: absolute;
+    left: 938px;
+    top: 590px;
+    width: 332px;
+    height: 500px;
+    display: grid;
+    grid-template-columns: 110px 214px;
+    grid-template-rows: 46px 62px 62px 62px 62px 62px 62px 68px;
+    gap: 2px;
+    background: #8669D7;
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 3;
+}
+
+/* 格子基础：纯白 */
+.rank-grid .cell {
+    background: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 24px;
+    color: #310080;
+    box-sizing: border-box;
+}
+
+/* 左列数据格：暗紫 */
+.rank-grid .cell:nth-child(2n+3) {
+    background: #310080;
+    color: #FFFFFF;
+}
+
+/* 表头两格：极浅紫（写在后面，覆盖左列规则） */
+.rank-grid .cell:nth-child(1),
+.rank-grid .cell:nth-child(2) {
+    background: #F7F1FF;
+    color: #310080;
+}
+
+/* 5 号图片：70×70 缩到 46×46 */
+.rank-grid .rank-label img[alt="5"] {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+}
+
+/* ===== 等级表：字体分配 ===== */
+
+/* 第二列数据（DX 分数）：DB */
+.rank-grid .cell:nth-child(2n) {
+    font-family: 'RodinHimawariPro-DB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* 第一列数据（等级）：EB */
+.rank-grid .cell:nth-child(2n+1):not(:first-child) {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* ===== 评级表外框 ===== */
+.rank2-frame-outer {
+    position: absolute;
+    left: 130px;
+    top: 1120px;
+    width: 1140px;
+    height: 160px;
+    border-radius: 10px;
+    background: transparent;
+    z-index: 4;
+    pointer-events: none;
+    border: 3px solid #8669D7;
+    box-sizing: border-box;
+    box-shadow:
+        0 0 0 3px #FFFFFF,
+        0px 8px 12px rgba(0, 0, 0, 0.50);
+}
+
+/* ===== 评级表内部网格 ===== */
+.rank2-grid {
+    position: absolute;
+    left: 133px;
+    top: 1123px;
+    width: 1134px;
+    height: 154px;
+    display: grid;
+    grid-template-columns: 119px repeat(7, 143px);
+    grid-template-rows: 62px 90px;
+    gap: 2px;
+    background: #8669D7;
+    border-radius: 7px;      /* 10 - 3 = 7，与外框内圆角一致 */
+    overflow: hidden;
+    z-index: 3;
+}
+
+/* 格子基础 */
+.rank2-grid .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    color: #310080;
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 18px;
+    line-height: 1.2;
+    padding: 4px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+/* 左侧第一格「目标评级」：略增大字号 */
+.rank2-grid .cell:nth-child(1) {
+    font-size: 26px;
+}
+
+/* 左侧第二格：略小字号 */
+.rank2-grid .cell:nth-child(9) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+/* 首行除第 1 格外：暗紫底白字 */
+.rank2-grid .cell:nth-child(-n+8):not(:first-child) {
+    background: #310080;
+    color: #FFFFFF;
+}
+
+/* 首列两个格子（第 1、9 格）：极浅紫 */
+.rank2-grid .cell:nth-child(1),
+.rank2-grid .cell:nth-child(9) {
+    background: #F7F1FF;
+    color: #310080;
+}
+
+/* 第二行数据格（除第 1 格）：DB 字体 + 26px */
+.rank2-grid .cell:nth-child(n+10) {
+    font-family: 'RodinHimawariPro-DB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 26px;
+}
+
+/* 评级图片：无损缩放至高 40px，居中 */
+.rank2-grid .cell img {
+    max-height: 40px;
+    max-width: 100%;
+    height: auto;
+    width: auto;
+    object-fit: contain;
+    display: block;
+}
+
+/* ===== 评级表 3 外框 ===== */
+.rank3-frame-outer {
+    position: absolute;
+    left: 130px;
+    top: 1310px;
+    width: 1140px;
+    height: 160px;
+    border-radius: 10px;
+    background: transparent;
+    z-index: 4;
+    pointer-events: none;
+    border: 3px solid #8669D7;
+    box-sizing: border-box;
+    box-shadow:
+        0 0 0 3px #FFFFFF,
+        0px 8px 12px rgba(0, 0, 0, 0.50);
+}
+
+.rank3-grid {
+    position: absolute;
+    left: 133px;
+    top: 1313px;
+    width: 1134px;
+    height: 154px;
+    display: grid;
+    grid-template-columns: 119px repeat(7, 143px);
+    grid-template-rows: 62px 90px;
+    gap: 2px;
+    background: #8669D7;
+    border-radius: 7px;
+    overflow: hidden;
+    z-index: 3;
+}
+
+/* 格子基础 */
+.rank3-grid .cell {
+    background: #FFFFFF;
+    color: #310080;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 18px;
+    line-height: 1.2;
+    box-sizing: border-box;
+    text-align: center;
+    padding: 2px;
+}
+
+/* 首行除第 1 格外：暗紫底白字 */
+.rank3-grid .cell:nth-child(-n+8):not(:first-child) {
+    background: #310080;
+    color: #FFFFFF;
+}
+
+/* 首列两格：极浅紫 */
+.rank3-grid .cell:nth-child(1),
+.rank3-grid .cell:nth-child(9) {
+    background: #F7F1FF;
+    color: #310080;
+}
+
+.rank3-grid .cell.label {
+    background: #F7F1FF;
+    color: #310080;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* 表头第 1 格：BREAK 判定 */
+.rank3-grid .cell.header-col1 {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 18px;
+}
+
+.rank3-grid .cell.header-col1 .break-en {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 18px;
+}
+
+.rank3-grid .cell.header-col1 .break-cn {
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 18px;
+}
+
+/* 表头双行：上下均 14px */
+.rank3-grid .cell .top,
+.rank3-grid .cell .bottom {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+.rank3-grid .cell .bottom {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 16px;
+    line-height: 1.1;
+}
+
+/* 表头单行（GOOD / MISS）：20px */
+.rank3-grid .cell:nth-child(7),
+.rank3-grid .cell:nth-child(8) {
+    font-size: 22px;
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* 第 2 行数据：DB 26px */
+.rank3-grid .cell:nth-child(n+10) {
+    font-family: 'RodinHimawariPro-DB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 26px;
+    display: flex;
+    flex-direction: row;
+}
+
+.rank3-grid .cell:nth-child(9) {
+    font-size: 18px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.rank3-grid .cell:nth-child(9) .mid-line {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* ===== 字体声明（请确保 fonts 文件夹与 HTML 同级） ===== */
+@font-face {
+    font-family: 'FOT-NewRodin Pro EB';
+    src: url('{{_staticPath}}/FOT-NewRodin%20Pro%20EB.otf') format('opentype');
+    font-display: swap; 
+}
+
+@font-face {
+    font-family: 'RodinHimawariPro-EB';
+    src: url('{{_staticPath}}/FOT-RodinHimawariPro-EB.otf') format('opentype');
+    font-display: swap; 
+}
+
+@font-face {
+    font-family: 'RodinHimawariPro-DB';
+    src: url('{{_staticPath}}/FOT-RodinHimawariPro-DB.otf') format('opentype');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'UDShinGoSCGbe-DeB';
+    src: url('{{_staticPath}}/森泽UD新黑%20Gb4%20DB.otf') format('opentype');
+    font-display: swap; 
+}
+
+/* ===== 曲绘 ===== */
+.cover-image {
+    position: absolute;
+    left: 55px;   
+    top: 40px;     
+    transform: scale(0.6);
+    transform-origin: top left; 
+    z-index: 4;
+}
+
+/* ===== 统一文字基础设置 ===== */
+.song-title, .song-subtitle {
+    font-family: 'FOT-NewRodin Pro EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    line-height: 1;
+    margin: 0;
+    z-index: 4;
+}
+
+/* 布局：所有格子共用 */
+.table-grid .cell {
+    display: grid;
+    place-items: center;
+    justify-content: center;
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    box-sizing: border-box;
+}
+
+.info, .total, .tap, .hold, .slide, .touch, .break, .song-dif, .total-count, .tap-count, .hold-count, .slide-count, .touch-count, .break-count {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    line-height: 1;
+    margin: 0;
+    z-index: 4;
+}
+
+.id, .song-id, .song-genre, .bpm, .song-bpm {
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    line-height: 1;
+    margin: 0;
+    z-index: 4;
+}
+
+/* ===== 文字位置 ===== */
+.song-title {
+    position: absolute;
+    left: 320px;
+    top: 50px;
+    font-size: 42px;
+    color: #333;
+}
+
+.song-subtitle {
+    position: absolute;
+    left: 320px;
+    top: 120px;
+    font-size: 20px;
+    color: #333;
+}
+
+.id {
+    position: absolute;
+    left: 480px;
+    top: 240px;
+    font-size: 30px;
+    color: #333;
+}
+
+.song-id {
+    position: absolute;
+    left: 520px;
+    top: 240px;
+    font-size: 30px;
+    color: #333;
+}
+
+.song-genre {
+    position: absolute;
+    left: 680px;
+    top: 240px;
+    font-size: 30px;
+    color: #333;
+}
+
+.song-genre.niconicoVOCALOID {
+    top: 228px;
+    line-height: 1.05;
+    text-align: center;
+}
+
+.bpm {
+    position: absolute;
+    left: 900px;
+    top: 240px;
+    font-size: 30px;
+    color: #333;
+}
+
+.song-bpm {
+    position: absolute;
+    left: 980px;
+    top: 240px;
+    font-size: 30px;
+    color: #333;
+}
+
+/* ===== 第 1 行：表头文字 ===== */
+.info {
+    font-size: 28px;
+    color: #310080;
+    font-weight: 700;
+}
+
+.total, .tap, .hold, .slide, .touch, .break {
+    font-size: 26px;
+    color: #FFF;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+/* ===== 第 2 行：数值文字 ===== */
+.total-count, .tap-count, .hold-count, .slide-count, .touch-count, .break-count {
+    font-size: 30px;
+    color: #310080;
+    font-weight: 700;
+}
+
+/* ===== 第 8 格：动态难度（两行，上小下大） ===== */
+.cell-dynamic {
+    background: #9F50DB;        /* 占位背景色，后续由数据决定 */
+    color: #FFF;                /* 文字色，随背景调整对比度 */
+    flex-direction: column;     /* 分两行 */
+    gap: 0px;                   /* 两行间距 */
+}
+
+.song-dif {
+    display: grid;
+    grid-template-rows: auto auto;
+    align-content: start;          /* 从顶部开始排 */
+    justify-items: center;
+    row-gap: 8px;
+    padding-top: 6px;             /* 距顶部留白，按需调 */
+}
+
+.song-dif .dif-name {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.song-dif .dif-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.dx-image {
+    position: absolute;
+    left: 320px;
+    top: 228px;
+    z-index: 4;
+}
+
+.sd-image {
+    position: absolute;
+    left: 320px;
+    top: 228px;
+    z-index: 4;
+}
+
+/* 只动文字，不动格子 */
+.table-grid .cell .txt {
+    display: inline-block;      /* 让 transform 生效 */
+}
+
+/* 第 1 行文字下移 2px */
+.table-grid .cell.info .txt,
+.table-grid .cell.total .txt,
+.table-grid .cell.tap .txt,
+.table-grid .cell.hold .txt,
+.table-grid .cell.slide .txt,
+.table-grid .cell.touch .txt,
+.table-grid .cell.break .txt {
+    transform: translateY(2px);
+}
+
+/* 第 2 行文字上移 2px */
+.table-grid .cell.total-count .txt,
+.table-grid .cell.tap-count .txt,
+.table-grid .cell.hold-count .txt,
+.table-grid .cell.slide-count .txt,
+.table-grid .cell.touch-count .txt,
+.table-grid .cell.break-count .txt {
+    transform: translateY(-6px);
+}
+
+/* 减细：换 DB 字体 */
+.table-grid .cell.total,
+.table-grid .cell.tap,
+.table-grid .cell.hold,
+.table-grid .cell.slide,
+.table-grid .cell.touch,
+.table-grid .cell.break,
+.table-grid .cell.tap-count,
+.table-grid .cell.hold-count,
+.table-grid .cell.slide-count,
+.table-grid .cell.touch-count,
+.table-grid .cell.break-count {
+    font-family: 'RodinHimawariPro-DB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* 1. 整个 score-grid 基础换字体 */
+.score-grid .cell {
+    font-family: 'RodinHimawariPro-DB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* 2. 单独把“分数线”还原回原字体 */
+.score-grid .cell:first-child {
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* 3. BREAK 区域全部换字体（含 BREAK 标签） */
+.break-region .sub {
+    font-family: 'RodinHimawariPro-DB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* ① 分数线：保持 UD 新黑，加粗 */
+.score-grid .cell:first-child {
+    font-family: 'UDShinGoSCGbe-DeB', sans-serif;
+    font-weight: 700;
+}
+
+/* ② 中间 TAP / HOLD / SLIDE / TOUCH：换 EB 粗体 */
+.score-grid .cell:nth-child(4n+1):not(:first-child) {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-weight: 700;
+}
+
+/* ③ 底部 BREAK：换 EB 粗体 */
+.break-region .break-label {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-weight: 700;
+}
+
+/* ===== 分数表第 1 行文字下移 2px ===== */
+.score-grid .cell:nth-child(-n+4) {
+    padding-top: 6px;
+}
+
+/* ===== 特定文字：换 EB 粗体 + 字号 -2px ===== */
+
+/* GREAT / GOOD / MISS：原本字号 20px → 18px */
+.score-grid .cell:nth-child(2),
+.score-grid .cell:nth-child(3),
+.score-grid .cell:nth-child(4) {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+/* BREAK 区域的 4.0 / 3.0 / 2.5 / 0.75 / 0.5：原本字号 20px → 18px */
+.break-region .sub:nth-child(2),   /* 4.0 */
+.break-region .sub:nth-child(6),   /* 3.0 */
+.break-region .sub:nth-child(8),   /* 2.5 */
+.break-region .sub:nth-child(10),  /* 0.75 */
+.break-region .sub:nth-child(12) { /* 0.5 */
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+/* GREAT / 4.0 / 3.0 / 2.5：粉色描边 */
+.score-grid .cell:nth-child(2),
+.break-region .sub:nth-child(2),   /* 4.0 */
+.break-region .sub:nth-child(6),   /* 3.0 */
+.break-region .sub:nth-child(8) {  /* 2.5 */
+    -webkit-text-stroke: 4px #F75EA3;
+    paint-order: stroke fill;
+}
+
+/* GOOD：绿色描边 */
+.score-grid .cell:nth-child(3) {
+    -webkit-text-stroke: 4px #2FCA4C;
+    paint-order: stroke fill;
+}
+
+/* MISS：灰色描边 */
+.score-grid .cell:nth-child(4) {
+    -webkit-text-stroke: 4px #868686;
+    paint-order: stroke fill;
+}
+
+/* 0.75 / 0.5：橙色描边 */
+.break-region .sub:nth-child(10),  /* 0.75 */
+.break-region .sub:nth-child(12) { /* 0.5 */
+    -webkit-text-stroke: 4px #FF9D00;
+    paint-order: stroke fill;
+}
+
+/* GREAT / 4.0 / 3.0 / 2.5 */
+.score-grid .cell:nth-child(2),
+.break-region .sub:nth-child(2),   /* 4.0 */
+.break-region .sub:nth-child(6),   /* 3.0 */
+.break-region .sub:nth-child(8) {  /* 2.5 */
+    color: #FFFFFF;
+}
+
+/* GOOD */
+.score-grid .cell:nth-child(3) {
+    color: #FFFFFF;
+}
+
+/* MISS */
+.score-grid .cell:nth-child(4) {
+    color: #FFFFFF;
+}
+
+/* 0.75 / 0.5 */
+.break-region .sub:nth-child(10),  /* 0.75 */
+.break-region .sub:nth-child(12) { /* 0.5 */
+    color: #FFFFFF;
+}
+
+/* 左侧第二格中间一行：换字体 */
+.rank2-grid .cell:nth-child(9) .mid-line {
+    font-family: 'RodinHimawariPro-EB', 'UDShinGoSCGbe-DeB', sans-serif;
+}
+
+/* ===== 表头描边 ===== */
+
+/* 0.75 / 0.5 PERFECT：橙色描边 */
+.rank3-grid .cell:nth-child(2),
+.rank3-grid .cell:nth-child(3) {
+    -webkit-text-stroke: 5px #FF9D00;
+    paint-order: stroke fill;
+}
+
+/* 4.0 / 3.0 / 2.5 GREAT：粉色描边 */
+.rank3-grid .cell:nth-child(4),
+.rank3-grid .cell:nth-child(5),
+.rank3-grid .cell:nth-child(6) {
+    -webkit-text-stroke: 5px #F75EA3;
+    paint-order: stroke fill;
+}
+
+/* GOOD：绿色描边 */
+.rank3-grid .cell:nth-child(7) {
+    -webkit-text-stroke: 5px #2FCA4C;
+    paint-order: stroke fill;
+}
+
+/* MISS：灰色描边 */
+.rank3-grid .cell:nth-child(8) {
+    -webkit-text-stroke: 5px #868686;
+    paint-order: stroke fill;
+}
+
+</style>
+</head>
+<body>
+
+
+<div class="container">
+  <div class="outer-wrapper">
+      <!-- 层1：90%透明白底 -->
+      <div class="white-mask"></div>
+      
+      <!-- 层2：外圈深灰、白、紫、白线条 -->
+      <div class="outer-lines"></div>
+      
+      <!-- 层3：完美的上下分色渐变线框 -->
+      <div class="gradient-line"></div>
+
+      <!-- 层4：曲绘与文字 -->
+      <img src="{{coverSrc}}" class="cover-image" alt="曲绘">
+           
+      <p class="song-title">{{song.title}}</p>
+      <p class="song-subtitle">{{song.artist}}</p>
+      
+{{if song.isDx}}<img src="{{_staticPath}}/mai/pic/DX.png" class="dx-image" alt="DX">{{else}}<img src="{{_staticPath}}/mai/pic/SD.png" class="sd-image" alt="SD">{{/if}}
+           
+      <p class="id">ID</p>
+      <p class="song-id">{{song.id}}</p>
+      <p class="song-genre{{song.genreClass}}">{{song.genre}}</p>
+      <p class="bpm">BPM</p>
+      <p class="song-bpm">{{song.bpm}}</p>
+  </div>
+  <!-- 外框（白 + 紫双层） -->
+  <div class="table-frame-outer"></div>
+
+  <!-- 内部 14 格 -->
+  <div class="table-grid">
+      <!-- 第 1 行 -->
+      <div class="cell cell-white info"><span class="txt">曲目信息</span></div>
+      <div class="cell cell-purple total"><span class="txt">TOTAL</span></div>
+      <div class="cell cell-purple tap"><span class="txt">TAP</span></div>
+      <div class="cell cell-purple hold"><span class="txt">HOLD</span></div>
+      <div class="cell cell-purple slide"><span class="txt">SLIDE</span></div>
+      <div class="cell cell-purple touch"><span class="txt">TOUCH</span></div>
+      <div class="cell cell-purple break"><span class="txt">BREAK</span></div>
+
+      <!-- 第 2 行 -->
+      <div class="cell cell-dynamic song-dif {{diff.cls}}">
+          <div class="dif-name">{{diff.name}}</div>
+          <div class="dif-value">{{diff.value}}</div>
+      </div>
+      <div class="cell cell-white total-count"><span class="txt">({{counts.total}})</span></div>
+      <div class="cell cell-white tap-count"><span class="txt">({{counts.tap}})</span></div>
+      <div class="cell cell-white hold-count"><span class="txt">({{counts.hold}})</span></div>
+      <div class="cell cell-white slide-count"><span class="txt">({{counts.slide}})</span></div>
+      <div class="cell cell-white touch-count"><span class="txt">({{counts.touch}})</span></div>
+      <div class="cell cell-white break-count"><span class="txt">({{counts.break}})</span></div>
+  </div>
+  <div class="score-frame-outer"></div>
+
+  <div class="score-grid">
+      <!-- 第 1 行：表头 -->
+      <div class="cell">分数线</div>
+      <div class="cell">GREAT</div>
+      <div class="cell">GOOD</div>
+      <div class="cell">MISS</div>
+{{each scoreRows row}}
+      <div class="cell">{{row.name}}</div>
+      <div class="cell">{{row.great}}</div>
+      <div class="cell">{{row.good}}</div>
+      <div class="cell">{{row.miss}}</div>
+{{/each}}
+  </div>
+
+  <div class="break-region">
+      <!-- BREAK 标签（跨3行） -->
+      <div class="sub break-label">BREAK</div>
+
+      <!-- 第 1 行 -->
+      <div class="sub">4.0</div>
+      <div class="sub">{{brk.g40}}</div>
+      <div class="sub merged-a">{{brk.good}}</div>
+      <div class="sub merged-b">{{brk.miss}}</div>
+
+      <!-- 第 2 行 -->
+      <div class="sub">3.0</div>
+      <div class="sub">{{brk.g30}}</div>
+
+      <!-- 第 3 行 -->
+      <div class="sub">2.5</div>
+      <div class="sub">{{brk.g25}}</div>
+      <div class="sub">0.75</div>
+      <div class="sub">{{brk.p75}}</div>
+      <div class="sub">0.5</div>
+      <div class="sub">{{brk.p50}}</div>
+  </div>
+  <div class="rank-grid">
+      <!-- 第 1 行：表头 -->
+      <div class="cell">等级</div>
+      <div class="cell">DX分数</div>
+{{each dx row}}
+      {{if row.isPercent}}<div class="cell">{{row.label}}</div>{{else}}<div class="cell rank-label"><img src="{{row.iconSrc}}" alt="{{row.label}}"></div>{{/if}}
+      <div class="cell">{{row.text}}</div>
+{{/each}}
+  </div>
+  <div class="rank-frame-outer"></div>
+  <div class="rank2-grid">
+      <!-- 第 1 行：表头 -->
+      <div class="cell">目标评级</div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_SSSp.png" alt="SSS+"></div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_SSS.png" alt="SSS"></div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_SSp.png" alt="SS+"></div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_SS.png" alt="SS"></div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_Sp.png" alt="S+"></div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_S.png" alt="S"></div>
+      <div class="cell"><img src="{{_staticPath}}/mai/pic/prism_plus/UI_TTR_Rank_A.png" alt="A"></div>
+
+      <!-- 第 2 行：数据 -->
+      <div class="cell">
+          <span>允许最多的</span>
+          <span class="mid-line">GREAT&nbsp;TAP</span>
+          <span>数量</span>
+      </div>
+{{each rating row}}
+      <div class="cell">{{row.n}}</div>
+{{/each}}
+  </div>
+  <div class="rank2-frame-outer"></div>
+  <div class="rank3-grid">
+      <!-- 第 1 行：表头 -->
+      <div class="cell header-col1">
+          <span class="break-en">BREAK</span>
+          <span class="break-cn">判定</span>
+      </div>
+      <div class="cell"><span class="top">0.75</span><span class="bottom">PERFECT</span></div>
+      <div class="cell"><span class="top">0.5</span><span class="bottom">PERFECT</span></div>
+      <div class="cell"><span class="top">4.0</span><span class="bottom">GREAT</span></div>
+      <div class="cell"><span class="top">3.0</span><span class="bottom">GREAT</span></div>
+      <div class="cell"><span class="top">2.5</span><span class="bottom">GREAT</span></div>
+      <div class="cell">GOOD</div>
+      <div class="cell">MISS</div>
+
+      <!-- 第 2 行：数据 -->
+      <div class="cell label">
+          <span>相当于</span>
+          <span class="mid-line">GREAT&nbsp;TAP</span>
+          <span>的数量</span>
+      </div>
+{{each equiv row}}
+      <div class="cell">{{row.value}}</div>
+{{/each}}
+  </div>
+<div class="rank3-frame-outer"></div>
+</div>
+
+
+</body>
+</html>

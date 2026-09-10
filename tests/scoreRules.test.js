@@ -103,12 +103,15 @@ test('fsline 守卫：帮助分支 / 缺难度色 / 非法达成率 → 格式�
   await inst.fsline({ msg: '#mai fsline 帮助' })
   assert.deepEqual(replies, [FSLINE_HELP], '帮助应发文本')
 
+  // ⚠️ 达成率已改为**可选**（四张表由物量推出，见 lib/fsline.js）：
+  //    `#mai fsline 紫799` 现在直接出图、不再报格式错误，故从这里移出；
+  //    `#mai fsline 紫799 abc` 也会把它当曲名去查、回「未找到曲目」。
+  //    这两条正向/降级路径的断言放在 tests/fsline.test.js 与模板冒烟里，
+  //    因为走到 sendFsline 就会真去渲染（puppeteer），不适合放进这个纯规则单测。
   for (const msg of [
     '#mai fsline',            // 全缺
     '#mai fsline 799 100',    // 缺难度色
-    '#mai fsline 紫',         // 缺达成率
-    '#mai fsline 紫799',      // 只有难度色+id，无达成率
-    '#mai fsline 紫799 abc',  // 达成率非数
+    '#mai fsline 紫',         // 只有颜色、后面什么都没有
     '#mai fsline 紫999999 100', // id 不存在
   ]) {
     replies.length = 0
