@@ -113,14 +113,14 @@
         "desc": "（官方QQBot）补充游戏 QQ 以解锁水鱼查分器；clear 解除"
       },
       {
-        "title": "source <0|1|lxns|df>",
+        "title": "source <数据源>",
         "eg": "#{head} source 1",
-        "desc": "切换数据源（数字或别名；绑定落雪后已自动切换）"
+        "desc": "切换数据源（0=水鱼, 1=落雪；绑定落雪会自动切换）"
       },
       {
-        "title": "theme <0|1|prism_plus|circle>",
+        "title": "theme <主题>",
         "eg": "#{head} theme 1",
-        "desc": "切换渲染主题（数字或主题名）"
+        "desc": "切换渲染主题（支持数字或主题名）"
       }
     ]
   },
