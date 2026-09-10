@@ -93,11 +93,19 @@ export function supportGuoba() {
           label: '水鱼 OAuth ClientID',
           bottomHelpMessage: '与 ClientSecret 同时配置后「绑定水鱼」才可用',
           component: 'Input',
+          componentProps: {
+            placeholder: '请输入ClientID',
+            type: 'password'
+          }
         },
         {
           field: 'dfClientSecret',
           label: '水鱼 OAuth ClientSecret',
           component: 'Input',
+          componentProps: {
+            placeholder: '请输入ClientSecret',
+            type: 'password'
+          }
         },
         {
           field: 'dfAuthUrl',
@@ -111,17 +119,29 @@ export function supportGuoba() {
           label: '落雪开发者Token',
           bottomHelpMessage: '使用落雪数据源查分必需',
           component: 'Input',
+          componentProps: {
+            placeholder: '请输入开发者Token',
+            type: 'password'
+          }
         },
         {
           field: 'lxClientId',
           label: '落雪 OAuth ClientID',
           bottomHelpMessage: '与 Secret/回调地址同时配置后「绑定落雪」才可用',
           component: 'Input',
+          componentProps: {
+            placeholder: '请输入ClientID',
+            type: 'password'
+          }
         },
         {
           field: 'lxClientSecret',
           label: '落雪 OAuth ClientSecret',
           component: 'Input',
+          componentProps: {
+            placeholder: '请输入ClientSecret',
+            type: 'password'
+          }
         },
         {
           field: 'lxRedirectUri',
