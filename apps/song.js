@@ -12,9 +12,9 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import { head } from '../lib/config.js'
 import { getUserAndAuth } from '../lib/user.js'
-import { drawChartInfo, drawSongList } from '../lib/handler.js'
+import { drawChartInfo, drawSongList, drawVoteList, sortVotes, hasNumericQq, ALIAS_QQ_HINT } from '../lib/handler.js'
 import { toSegment, botName } from '../lib/render/picmodle.js'
-import { mai, ensureReady } from '../lib/service.js'
+import { mai, ensureReady, updateLocalAlias, rebuildAliasFromCache } from '../lib/service.js'
 import { YuzuChaNAPI } from '../lib/client/yuzuchan.js'
 import { awaitPickSong, handlePickSong } from '../lib/pickSong.js'
 
@@ -24,6 +24,14 @@ const REG_SONG = () => new RegExp(`^[#/]${H()}\\s*(?:song|查歌)(?:\\s+(.+))?$`
 const REG_SEARCH = () => new RegExp(`^[#/]${H()}\\s*(?:search|检索|搜索)(?:\\s+(.+))?$`)
 const REG_WHAT = () => new RegExp(`^[#/]${H()}\\s*what\\s+(.+)$`)
 const REG_ALIAS = () => new RegExp(`^[#/]${H()}\\s*alias(?:\\s+(.+))?$`)
+// 别名动作词（设计 §3.2 表下注：**动作词规则声明在前、通配查询殿后**，同 priority 先命中先服务）
+const REG_ALIAS_SYNC = () => new RegExp(`^[#/]${H()}\\s*(?:alias\\s+sync|更新别名库)\\s*$`)
+const REG_ALIAS_LOCAL = () => new RegExp(`^[#/]${H()}\\s*(?:alias\\s+local|本地别名)\\s+(.+)$`)
+const REG_ALIAS_APPLY = () => new RegExp(`^[#/]${H()}\\s*(?:alias\\s+apply|申请别名)\\s+(.+)$`)
+// tag 可缺（源同样照发空串），故参数可选——否则 `#mai alias vote` 会掉进通配查询分支。
+// 另收 `#mai vote …` 短写（投票时顺手，无需带 alias 词头；与 `alias votes` 不冲突，已由测试锁定）
+const REG_ALIAS_VOTE = () => new RegExp(`^[#/]${H()}\\s*(?:alias\\s+vote|同意别名|vote)(?:\\s+(.+))?\\s*$`)
+const REG_ALIAS_VOTES = () => new RegExp(`^[#/]${H()}\\s*(?:alias\\s+votes|当前投票)(?:\\s+(.+))?\\s*$`)
 const REG_WHAT_SAY = () => new RegExp(`^(.+)是(什么|啥)歌[？?]?([0-9]+)?$`)
 
 const isFloat = v => !Number.isNaN(parseFloat(v))
@@ -348,10 +356,21 @@ export class MaiSong extends plugin {
   }
 }
 
+/** 别名列表里是否已有该项（大小写不敏感；服务端存在含大写的别名，源只 lower 了查询侧会漏判） */
+const hasAlias = (list, name) => list.some(a => String(a).toLowerCase() === String(name).toLowerCase())
+
+/** 取动作词规则捕获的参数并按空白切分（源 commands 用 `extract_plain_text().split()`） */
+function aliasArgs(e, reg) {
+  return ((e.msg.match(reg) || [])[1] || '').trim().split(/\s+/).filter(Boolean)
+}
+
 /**
- * #mai alias <id|曲名|别名> —— 查指定曲目的别名列表（设计 §3.2-44 查询侧）
- * 对齐 phi-plugin `#phi alias <曲名>` 心智：alias 词头后接动作词（sync/local/apply/vote/votes）
- * 属管理/投票路由（P3 实现，本类规则仅注册通配查询，动作词在 fnc 内预留分流）。
+ * #mai alias 族（设计 §3.2-37..44）
+ *
+ * `alias` 词头双义（对齐 phi-plugin 先例）：后接动作词 `sync/local/apply/vote/votes`
+ * 走管理/投票路由，否则整段按曲名查别名。消歧靠**规则声明顺序**——动作词五条在前、
+ * 通配查询殿后，同 priority 先命中先服务（禁复杂负向前瞻）。
+ * 本仓 `apps/table.js` 同样依赖顺序，`tests/tableRules.test.js` 有「规则表顺序」测试锁着。
  */
 export class MaiAlias extends plugin {
   constructor() {
@@ -361,9 +380,223 @@ export class MaiAlias extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s*alias\\s+(.+)$`, fnc: 'queryAlias' },
+        { reg: REG_ALIAS_SYNC().source, fnc: 'syncAlias', permission: 'master' },
+        { reg: REG_ALIAS_LOCAL().source, fnc: 'addLocal' },
+        { reg: REG_ALIAS_APPLY().source, fnc: 'applyAlias' },
+        { reg: REG_ALIAS_VOTE().source, fnc: 'voteAlias' },
+        { reg: REG_ALIAS_VOTES().source, fnc: 'listVotes' },
+        // ⚠️ 通配查询必须殿后，否则会吃掉上面五条动作词
+        { reg: REG_ALIAS().source, fnc: 'queryAlias' },
       ],
     })
+  }
+
+  /** #mai alias sync / 更新别名库 —— 手动更新别名库（仅主人，源 mai_alias.py:40-48） */
+  async syncAlias(e) {
+    if (!(await ensureReady(e))) return true
+    try {
+      await mai.getMusicAlias()
+      logger?.mark?.('手动更新别名库成功')
+      await this.reply('手动更新别名库成功', true)
+    } catch (error) {
+      logger?.error?.('手动更新别名库失败', error?.message || error)
+      await this.reply('手动更新别名库失败', true)
+    }
+    return true
+  }
+
+  /** #mai alias local <id> <别名> / 本地别名 —— 添加本地别名（源 mai_alias.py:51-81，校验顺序逐字照搬） */
+  async addLocal(e) {
+    if (!(await ensureReady(e))) return true
+    const args = aliasArgs(e, REG_ALIAS_LOCAL())
+    if (args.length !== 2) {
+      await this.reply('参数错误', true)
+      return true
+    }
+    const [idRaw, aliasName] = args
+    if (!/^\d+$/.test(idRaw)) {
+      await this.reply('请输入正确的ID', true)
+      return true
+    }
+    const songId = parseInt(idRaw, 10)
+    if (!mai.totalList.byId(songId)) {
+      await this.reply(`未找到ID「${songId}」的曲目`, true)
+      return true
+    }
+
+    // 服务器已存在同名别名则拒绝。源此处不做异常保护（网络抖动会直接失败），
+    // 端口改为失败即跳过该前置校验——后续合并本就是「柚子优先」去重，跳过无副作用。
+    //
+    // 比较用**大小写不敏感**：源写的是 `alias_name.lower() in server_exist.alias`，
+    // 只在服务端别名本身是小写时才成立（实测 2117 个含拉丁字母的别名里有 14 个含大写，
+    // 如 `2B`/`OW`/`TwisteD！XD`），那 14 个会让源的校验漏判。这里两侧都归一。
+    let serverAlias = null
+    try {
+      serverAlias = await new YuzuChaNAPI().getAliasesBySongId(songId)
+    } catch { /* 跳过前置校验 */ }
+    if (serverAlias && Array.isArray(serverAlias.alias) && hasAlias(serverAlias.alias, aliasName)) {
+      await this.reply(`该曲目的别名「${aliasName}」已存在别名服务器`, true)
+      return true
+    }
+
+    const local = mai.totalAliasList.byId(songId)
+    if (local.length && hasAlias(local[0].alias, aliasName)) {
+      await this.reply('本地别名库已存在该别名', true)
+      return true
+    }
+
+    if (!updateLocalAlias(songId, aliasName)) {
+      await this.reply('添加本地别名失败', true)
+      return true
+    }
+    // 「加完即生效」：源写完只改内存、要等下次更新才落进合并库；
+    // 这里就地用缓存重建（缓存缺失——首次安装尚未同步——才联网兜底）
+    if (!rebuildAliasFromCache()) {
+      try {
+        await mai.getMusicAlias()
+      } catch { /* 网络不可用也无妨：内存态已生效，下次同步自会合并 */ }
+    }
+    await this.reply(`已成功为ID「${songId}」添加别名「${aliasName}」到本地别名库`, true)
+    return true
+  }
+
+  /** #mai alias apply <id> <别名> / 申请别名 —— 向柚子提交申请表（源 mai_alias.py:84-109，群聊） */
+  async applyAlias(e) {
+    if (!(await ensureReady(e))) return true
+    const args = aliasArgs(e, REG_ALIAS_APPLY())
+    if (args.length < 2) {
+      await this.reply('参数错误', true)
+      return true
+    }
+    const [idRaw, ...rest] = args
+    if (!/^\d+$/.test(idRaw)) {
+      await this.reply('请输入正确的ID', true)
+      return true
+    }
+    const aliasName = rest.join(' ') // 源 `" ".join(args[1:])`
+    if (!mai.totalList.byId(parseInt(idRaw, 10))) {
+      await this.reply(`未找到ID「${idRaw}」的曲目`, true)
+      return true
+    }
+    if (!e.isGroup) {
+      await this.reply('别名申请需在群聊中发起（源限制为群消息事件）。', true)
+      return true
+    }
+    // 服务端把 apply_uid 当整数 QQ 校验（源在 OneBot 下 e.user_id 就是 QQ 号；
+    // 本仓官方 QQBot 环境是 openid，直发会 422 int_parsing）⇒ 走 #mai bind qq 补充的数字 QQ
+    const uid = await this.numericQq(e)
+    if (uid == null) return true
+
+    const api = new YuzuChaNAPI()
+    let exist
+    try {
+      exist = await api.getAliasesBySongId(idRaw)
+    } catch (error) {
+      await this.reply(String(error?.message || error), true)
+      return true
+    }
+    if (exist && Array.isArray(exist.alias) && exist.alias.includes(aliasName.toLowerCase())) {
+      await this.reply(`该曲目的别名「${aliasName}」已存在别名服务器`, true)
+      return true
+    }
+
+    // song_id 源侧就是字符串，照传；回复文案完全由服务端下发（源 finish(result.message)）
+    const result = await api.postAlias(idRaw, aliasName, uid, e.group_id)
+    await this.reply(result?.message ?? String(result), true)
+    return true
+  }
+
+  /**
+   * 取用于别名申请/投票的**数字 QQ**（不可用时已回复引导并返回 null）
+   * 源在 OneBot 下 `e.user_id` 即 QQ 号；本仓兼容 openid 环境，故统一走用户行的 qqid。
+   */
+  async numericQq(e) {
+    const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
+    if (!got) return null
+    if (!hasNumericQq(got.user)) {
+      await this.reply(ALIAS_QQ_HINT, true)
+      return null
+    }
+    return got.user.qqid
+  }
+
+  /**
+   * #mai alias vote <tag|#N> / 同意别名 / #mai vote —— 给进行中的申请投同意票
+   * （源 mai_alias.py:112-122）
+   *
+   * `#N` 取自 `#mai alias votes` 图上的**全局编号**，在这里按同一排序口径换回真实 tag ——
+   * 于是 `#mai alias vote #1` 与 `#mai alias vote <某串乱码 tag>` 等效，用户不必抄那串标签。
+   */
+  async voteAlias(e) {
+    if (!(await ensureReady(e))) return true
+    const raw = ((e.msg.match(REG_ALIAS_VOTE()) || [])[1] || '').trim()
+
+    // 同 applyAlias：服务端按整数 QQ 校验 agree_user
+    const uid = await this.numericQq(e)
+    if (uid == null) return true
+
+    let tag = raw.toUpperCase()
+    const byIndex = tag.match(/^#(\d+)$/)
+    if (byIndex) {
+      let list
+      try {
+        list = sortVotes(await new YuzuChaNAPI().getStatus())
+      } catch (error) {
+        await this.reply(String(error?.message || error), true)
+        return true
+      }
+      const picked = list[parseInt(byIndex[1], 10) - 1]
+      if (!picked) {
+        await this.reply(
+          `没有编号 ${byIndex[1]} 的投票（当前共 ${list.length} 条）。\n`
+          + '先发送「#mai alias votes」查看带编号的投票列表。',
+          true,
+        )
+        return true
+      }
+      tag = String(picked.tag).toUpperCase()
+    }
+
+    let msg
+    try {
+      const status = await new YuzuChaNAPI().postAgreeUser(tag, uid)
+      msg = status?.message ?? String(status)
+    } catch (error) {
+      logger?.error?.('[mai-plugin] 同意别名失败：', error?.message || error)
+      msg = String(error?.message || error)
+    }
+    await this.reply(msg, true)
+    return true
+  }
+
+  /**
+   * #mai alias votes [页] / 当前投票 —— 进行中的别名投票列表（源 mai_alias.py:125-155）
+   * 源走 text_to_bytes_io 转图；端口沿用出图形态（投票行带曲绘/版本图标，比转发文本可读），
+   * 版式复用曲目列表，信息区换成投票字段（见 lib/render/views.js:voteListView）。
+   */
+  async listVotes(e) {
+    if (!(await ensureReady(e))) return true
+    const raw = ((e.msg.match(REG_ALIAS_VOTES()) || [])[1] || '').trim()
+    let status
+    try {
+      status = await new YuzuChaNAPI().getStatus()
+    } catch (error) {
+      await this.reply(String(error?.message || error), true)
+      return true
+    }
+    if (!Array.isArray(status) || !status.length) {
+      await this.reply('未查询到正在进行的别名投票', true)
+      return true
+    }
+
+    const page = /^\d+$/.test(raw) ? parseInt(raw, 10) : 1
+    const image = await drawVoteList(sortVotes(status), page)
+    if (typeof image === 'string') {
+      await this.reply(image, true)
+      return true
+    }
+    await this.reply(toSegment(image), true)
+    return true
   }
 
   /** 别名查询入口：id / 曲名精确 / 别名精确 / 标题过滤 解析到目标曲（源查别名链） */
@@ -372,12 +605,6 @@ export class MaiAlias extends plugin {
     const raw = ((e.msg.match(REG_ALIAS()) || [])[1] || '').trim()
     if (!raw) {
       await this.reply('用法：#mai alias <曲名|id|别名>\n例：#mai alias 悲怆（查询该别名所属曲目的全部别名）', true)
-      return true
-    }
-
-    // 动作词预留（P3 管理/投票路由，勿落到通配查询）
-    if (['sync', 'local', 'apply', 'vote', 'votes'].includes(raw.split(/\s+/)[0])) {
-      await this.reply(`「${raw.split(/\s+/)[0]}」属于别名管理指令，将在后续版本开放。`, true)
       return true
     }
 

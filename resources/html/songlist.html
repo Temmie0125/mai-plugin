@@ -45,9 +45,11 @@
     .a-lm { transform: translateY(-50%); }
     .a-rm { transform: translate(-100%, -50%); }
     .a-mm { transform: translate(-50%, -50%); }
+    /* 回退链第二档必须是**简体中文字体**：FOT(日文)/Torus(拉丁) 都缺简体字形，
+       直接落到 Microsoft YaHei 会字重风格突变、观感断裂（如「别」字）。mai-sy 与 help.html 主字体同款。 */
     .f-sy { font-family: 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
-    .f-tb { font-family: 'mai-tb', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
-    .f-fot { font-family: 'mai-fot', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-tb { font-family: 'mai-tb', 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-fot { font-family: 'mai-fot', 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
   </style>
 </head>
 <body>

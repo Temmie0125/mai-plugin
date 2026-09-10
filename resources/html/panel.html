@@ -75,9 +75,11 @@
        （Level. 标题 = ld，源 rating_table.py:164/185；完成表 /N 分母 = rd，plate_table.py:437）。 */
     .a-ld { transform: translateY(-100%); }
     .a-rd { transform: translate(-100%, -100%); }
+    /* 回退链第二档必须是**简体中文字体**：FOT(日文)/Torus(拉丁) 都缺简体字形，
+       直接落到 Microsoft YaHei 会字重风格突变、观感断裂（如「别」字）。mai-sy 与 help.html 主字体同款。 */
     .f-sy { font-family: 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
-    .f-tb { font-family: 'mai-tb', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
-    .f-fot { font-family: 'mai-fot', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-tb { font-family: 'mai-tb', 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+    .f-fot { font-family: 'mai-fot', 'mai-sy', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
   </style>
 </head>
 <body>

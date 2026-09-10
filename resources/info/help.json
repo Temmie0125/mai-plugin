@@ -173,9 +173,9 @@
         "desc": "申请新别名（群内投票）"
       },
       {
-        "title": "alias votes [页] / vote <标签>",
+        "title": "alias votes [页] / alias vote <标签|#编号>",
         "eg": "#{head} alias votes",
-        "desc": "查看投票 / 同意别名"
+        "desc": "查看进行中的别名投票（图内带编号）/ 投票，投票可简写「#{head} vote #1」"
       },
       {
         "title": "alias local <id> <别名>",
