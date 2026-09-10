@@ -39,7 +39,7 @@ export class MaiManage extends plugin {
       event: 'message',
       priority: 100,
       rule: [
-        { reg: `^[#/]${H()}\\s*(强制)?\\s*(?:更新|gx|update)\\s*$`, fnc: 'update' },
+        { reg: `^[#/]${H()}\\s*(强制)?\\s*(?:更新|gx)\\s*$`, fnc: 'update' },
       ],
     })
   }
