@@ -228,7 +228,7 @@ export class MaiSong extends plugin {
     const aliasHeader = source === 'alias' && songs.length > 1
       ? `找到 ${songs.length} 个相同别名的曲目：`
       : null
-    const idHint = aliasHeader ? '※ 发送「#mai song <ID>」可直接查询指定曲目' : null
+    const idHint = aliasHeader ? `※ 发送「#${H()} song <ID>」可直接查询指定曲目` : null
 
     if (!forceList && songs.length === 1) {
       const payload = await drawChartInfo(songs[0], user)
@@ -255,7 +255,7 @@ export class MaiSong extends plugin {
     const page = isSay ? parseInt(match[3] || '1', 10) : 1
     const errorMsg = [
       `未找到别名为「${name}」的歌曲`,
-      '※ 发送「#mai alias apply <ID> <别名>」可申请添加（投票功能将在后续版本开放）',
+      `※ 发送「#${H()} alias apply <ID> <别名>」可申请添加`,
       '※ 如果是歌名的一部分，请使用「查歌」指令查询哦。',
     ].join('\n')
 
@@ -272,7 +272,7 @@ export class MaiSong extends plugin {
           for (const s of obj.data) {
             msg += `- ${s.tag}\n    ID ${s.song_id}: ${s.name}\n`
           }
-          msg += '※ 可以使用指令「同意别名 XXXXX」进行投票'
+          msg += `※ 可以使用指令「#${H()} vote XXXXX」进行投票`
           await this.reply(msg.trim(), true)
           return true
         }
@@ -288,7 +288,7 @@ export class MaiSong extends plugin {
         for (const song of aliasData) {
           msg += `${song.song_id}：${song.song_name}\n`
         }
-        msg += '※ 发送「#mai song <ID>」可直接按曲目 ID 查询'
+        msg += `※ 发送「#${H()} song <ID>」可直接按曲目 ID 查询`
         await this.reply(msg.trim(), true)
         return true
       }
@@ -340,7 +340,7 @@ export class MaiSong extends plugin {
       for (const song of [...result].sort((a, b) => a.song_id - b.song_id)) {
         msg += `${songLine(song)}\n`
       }
-      msg += '※ 发送「#mai song <ID>」可直接按曲目 ID 查询'
+      msg += `※ 发送「#${H()} song <ID>」可直接按曲目 ID 查询`
       await this.reply(msg, true)
     } else {
       const image = await drawSongList(result, page)
@@ -549,7 +549,7 @@ export class MaiAlias extends plugin {
       if (!picked) {
         await this.reply(
           `没有编号 ${byIndex[1]} 的投票（当前共 ${list.length} 条）。\n`
-          + '先发送「#mai alias votes」查看带编号的投票列表。',
+          + `先发送「#${H()} alias votes」查看带编号的投票列表。`,
           true,
         )
         return true
@@ -604,14 +604,14 @@ export class MaiAlias extends plugin {
     if (!(await ensureReady(e))) return true
     const raw = ((e.msg.match(REG_ALIAS()) || [])[1] || '').trim()
     if (!raw) {
-      await this.reply('用法：#mai alias <曲名|id|别名>\n例：#mai alias 悲怆（查询该别名所属曲目的全部别名）', true)
+      await this.reply(`用法：#${H()} alias <曲名|id|别名>\n例：#${H()} alias 悲怆（查询该别名所属曲目的全部别名）`, true)
       return true
     }
 
     const songs = resolveAliasTargets(raw)
     if (!songs.length) {
       await this.reply(
-        `未找到「${raw}」对应的曲目或别名。\n※ 可尝试 #mai what ${raw} 或 #mai song ${raw} 查找该曲。`,
+        `未找到「${raw}」对应的曲目或别名。\n※ 可尝试 #${H()} what ${raw} 或 #${H()} song ${raw} 查找该曲。`,
         true,
       )
       return true

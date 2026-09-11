@@ -49,7 +49,7 @@ const isGroupAdmin = e => Boolean(e.isMaster || e.member?.is_owner || e.member?.
 const displayName = e => String(e.sender?.card || e.sender?.nickname || e.user_id || '')
 
 /** 该群已在进行的游戏类型 → 统一文案（源只提两类，第三类落地后必然失真，已登记） */
-const busyHint = () => '该群已有正在进行的游戏（猜歌/猜曲绘/开字母），可发 #mai ans 结束或等它超时'
+const busyHint = () => `该群已有正在进行的游戏（猜歌/猜曲绘/开字母），可发 #${H()} ans 结束或等它超时`
 
 /** 群开关未开时的引导（源原文是「开启请输入 开启mai猜歌」；收编为子命令后改为本插件语法，已登记） */
 const disabledHint = () => `该群已关闭猜歌功能，开启请输入 #${head()} guess on`
@@ -115,7 +115,7 @@ export class MaiGuess extends plugin {
     await this.reply(
       '开字母开始！直接发送曲名或别名即可作答（一条命中多首会一起判对）。\n'
       + '发送「#open 字母」翻开一个字母，如「#open J」；'
-      + '发送「#mai ans」可提前结束并看答案。',
+      + `发送「#${H()} ans」可提前结束并看答案。`,
       true,
     )
     await this.reply(letterBoardText(game), true)

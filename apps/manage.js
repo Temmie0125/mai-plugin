@@ -132,7 +132,7 @@ export class MaiManage extends plugin {
       logger?.error?.('[mai-plugin] 定时同步曲库失败：', msg)
       try {
         await globalThis.Bot?.sendMasterMsg?.(
-          `[mai-plugin] 每日自动同步曲库失败：${msg}\n可发送「#mai sync」手动重试。`,
+          `[mai-plugin] 每日自动同步曲库失败：${msg}\n可发送「#${H()} sync」手动重试。`,
         )
       } catch { /* 通知失败不影响任务本身 */ }
     }

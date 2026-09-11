@@ -30,7 +30,7 @@ export class MaiBase extends plugin {
     if (!ready.ready) {
       await this.reply(
         `未检测到静态资源包（当前曲绘 ${ready.count} 张），无法渲染图片。\n` +
-          '请阅读插件 README「安装与资源」：复制 NoneBot 资源包或下载资源包解压到 plugins/mai-plugin/resources/static/ 后重启。'
+          `请阅读插件 README「安装与资源」：以主人权限执行「${H()} download」后重启。`
       )
       return true
     }

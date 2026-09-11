@@ -120,13 +120,13 @@ const DIVINGFISH_OAUTH_ERROR = 'BOT管理员尚未配置水鱼查分器 OAuth �
 const DIVINGFISH_BIND_FAILED_MSG = '发起水鱼授权失败：水鱼账号服务可能暂时不可用，请稍后再试。'
 
 const BIND_QQ_HELP = [
-  '用法：#mai bind qq <你的QQ号>（解除：bind qq clear）',
+  `用法：#${H()} bind qq <你的QQ号>（解除：bind qq clear）`,
   '※ 官方QQBot 环境只有 openid、读不到 QQ 号；水鱼查分器按 QQ 代查需你主动提供一次，',
   '   仅写入本插件本地数据（data/user.json），用于水鱼授权与查询。',
 ].join('\n')
 
 const UNBIND_HELP = [
-  '用法：#mai unbind <lxns|df|qq>（别名：解绑）',
+  `用法：#${H()} unbind <lxns|df|qq>（别名：解绑）`,
   '・lxns/落雪：清除本地落雪凭据与好友码；指针在落雪时自动切回水鱼',
   '・df/水鱼：清本地令牌缓存并提供服务端撤销页（水鱼凭据不落 BOT）',
   '・qq：解除「bind qq」补充的游戏 QQ（官方QQBot 水鱼将重新受限）',
@@ -259,7 +259,7 @@ export class MaiBind extends plugin {
     database.updateUser(got.user.key, { qqid: qq })
     await this.reply(
       `已绑定游戏 QQ「${qq}」。\n` +
-      '※ 官方QQBot 环境无法自读 QQ 号，水鱼查分器现在起可用：发送「#mai bind df」完成授权后即可查分。',
+      `※ 官方QQBot 环境无法自读 QQ 号，水鱼查分器现在起可用：发送「#${H()} bind df」完成授权后即可查分。`,
       true,
     )
     return true
@@ -354,7 +354,7 @@ export class MaiBind extends plugin {
 
     // qq：清除补充的游戏 QQ
     database.updateUser(user.key, { qqid: null })
-    await this.reply('已解除游戏 QQ 绑定，水鱼查分器将恢复受限（可随时「#mai bind qq」重新补充）。', true)
+    await this.reply(`已解除游戏 QQ 绑定，水鱼查分器将恢复受限（可随时「#${H()} bind qq」重新补充）。`, true)
     return true
   }
 
