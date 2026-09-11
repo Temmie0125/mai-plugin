@@ -183,8 +183,8 @@ export class MaiRand extends plugin {
     const songs = filterRandSongs(raw)
     if (!songs) {
       await this.reply(
-        '随机谱面用法：#mai rand [dx|sd][绿黄红紫白][定数]\n'
-        + '例：#mai rand（全曲库随机）、#mai rand dx紫14、#mai rand 13、#mai rand 白13+',
+        `随机谱面用法：#${H()} rand [dx|sd][绿黄红紫白][定数]\n`
+        + `例：#${H()} rand（全曲库随机）、#${H()} rand dx紫14、#${H()} rand 13、#${H()} rand 白13+`,
         true,
       )
       return true

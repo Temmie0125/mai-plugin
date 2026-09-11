@@ -208,7 +208,7 @@ export class MaiBind extends plugin {
     if (!got) return true
     if (!Number.isInteger(got.user.qqid) || got.user.qqid <= 0) {
       // 官方QQBot(openid)环境无水鱼所需的 QQ 号
-      await this.reply(DF_QQ_HINT, true)
+      await this.reply(DF_QQ_HINT(), true)
       return true
     }
     try {

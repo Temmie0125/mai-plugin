@@ -6,7 +6,9 @@
  * - 下载资源：静态资源包 clone/update（详见 lib/resourcePack.js），
  *   对应 phi 的「下载曲绘」；插件更新后按 autoUpdateAssets 自动跟进，对应 autoPullPhiIll
  * - 同步曲库：`#mai sync` 与每日定时 task 共用 lib/sync.js 的同一把锁（P3 实施文档 §3）
- * - 更新成功回最近提交日志；git/remote 缺失给中文引导；执行中防重入
+ * - 更新成功回最近提交日志（合并转发不支持引用回复，一律不引用，避免多发一条空引用消息）；
+ *   对齐 phi-plugin 的重启判断：提交信息带 √/✓ 视为热更安全，否则更新完毕自动重启宿主；
+ *   git/remote 缺失给中文引导；执行中防重入
  * 提示：本仓库已配置 origin（https://github.com/Temmie0125/mai-plugin.git）
  */
 import { exec } from 'node:child_process'
@@ -82,28 +84,27 @@ export class MaiManage extends plugin {
   /** #mai sync / 更新曲库 / 数据更新 —— 全量同步曲库/别名/牌子（仅主人） */
   async syncMusic(e) {
     if (!e.isMaster) {
-      await this.reply('该指令仅主人可用', true)
+      await this.reply('该指令仅主人可用')
       return true
     }
     if (isSyncing()) {
-      await this.reply('正在同步中，请稍候', true)
+      await this.reply('正在同步中，请稍候')
       return true
     }
 
-    await this.reply('正在同步曲库…', true)
+    await this.reply('正在同步曲库…')
     // handleErrors：成功返回原值，失败返回可发送的中文文案（lib/handlerError.js）
     const r = await handleErrors(() => syncMusicData())
     if (typeof r === 'string') {
-      await this.reply(r, true)
+      await this.reply(r)
       return true
     }
     if (r?.busy) {
-      await this.reply('正在同步中，请稍候', true)
+      await this.reply('正在同步中，请稍候')
       return true
     }
     await this.reply(
       `曲库/别名/牌子同步完成（曲库 ${mai.totalList.root.length} 曲 / 别名 ${mai.totalAliasList.root.length} 条）`,
-      true,
     )
     return true
   }
@@ -141,18 +142,18 @@ export class MaiManage extends plugin {
   /** #mai 更新 / #mai 强制更新 */
   async update(e) {
     if (!e.isMaster) {
-      await this.reply('该指令仅主人可用', true)
+      await this.reply('该指令仅主人可用')
       return true
     }
     if (updating) {
-      await this.reply('已有更新在执行中，请勿重复操作', true)
+      await this.reply('已有更新在执行中，请勿重复操作')
       return true
     }
 
     try {
       await git('git --version')
     } catch {
-      await this.reply('未检测到 git，请先安装 git 后重试', true)
+      await this.reply('未检测到 git，请先安装 git 后重试')
       return true
     }
 
@@ -164,16 +165,15 @@ export class MaiManage extends plugin {
       if (!remotes.trim()) {
         await this.reply(
           `未配置远程仓库，请先执行：\ngit -C plugins/mai-plugin remote add origin ${REPO_URL}.git`,
-          true,
         )
         return true
       }
     } catch (error) {
-      await this.reply(`git remote 检查失败：${error.message}`, true)
+      await this.reply(`git remote 检查失败：${error.message}`)
       return true
     }
 
-    await this.reply(force ? '开始执行强制更新（将放弃本地改动），请稍候…' : '开始拉取插件更新，请稍候…', true)
+    await this.reply(force ? '开始执行强制更新（将放弃本地改动），请稍候…' : '开始拉取插件更新，请稍候…')
     updating = true
 
     const root = shellPath(pluginRoot)
@@ -196,44 +196,62 @@ export class MaiManage extends plugin {
       ret = await git(command)
     } catch (error) {
       updating = false
-      await this.reply(this.gitErrText(error), true)
+      await this.reply(this.gitErrText(error))
       return true
     }
     updating = false
 
     if (/Already up[ -]to[ -]date|已经是最新的/i.test(ret)) {
       const time = await this.lastCommitTime()
-      await this.reply(`插件已经是最新版本\n最后提交时间：${time}`, true)
+      await this.reply(`插件已经是最新版本\n最后提交时间：${time}`)
       await this.autoSyncAssets()
       return true
     }
 
     const time = await this.lastCommitTime()
-    await this.reply(`插件更新完成\n最后提交时间：${time}`, true)
+    await this.reply(`插件更新完成\n最后提交时间：${time}`)
+    // oldCommit 取不到 ⇒ 改动范围未知，按需重启兜底
+    let needRestart = !oldCommit
     if (oldCommit) {
-      await this.commitLogs(oldCommit, e)
+      needRestart = await this.commitLogs(oldCommit, e)
     }
-    await this.reply('更新完成。若修改涉及命令/启动逻辑，请重启 Bot 生效（宿主热更不保证覆盖）。', true)
     await this.autoSyncAssets()
+    // 对齐 phi-plugin：新提交全带 √/✓ 标记则热更即可，否则自动重启宿主应用更新
+    if (needRestart) {
+      if (this.restart()) {
+        await this.reply('更新完毕，正在重启云崽以应用更新')
+      } else {
+        await this.reply('更新完毕。宿主不支持自动重启，请手动重启 Bot 生效。')
+      }
+    } else {
+      await this.reply('更新完毕，本次更新不需要进行重启')
+    }
+    return true
+  }
+
+  /** 重启宿主 Bot（TRSS-Yunzai 的 Bot.restart 会先落盘 redis 再退出进程；2 秒缓冲让回执先送达） */
+  restart() {
+    if (!globalThis.Bot?.restart) return false
+    setTimeout(() => globalThis.Bot.restart(), 2000)
     return true
   }
 
   /** #mai download / 下载资源 / 更新资源：下载或更新静态资源包 */
   async downRes(e) {
     if (!e.isMaster) {
-      await this.reply('该指令仅主人可用', true)
+      await this.reply('该指令仅主人可用')
       return true
     }
     if (syncingRes) {
-      await this.reply('资源更新已在执行中，请勿重复操作', true)
+      await this.reply('资源更新已在执行中，请勿重复操作')
       return true
     }
     if (!(await hasGit())) {
-      await this.reply('未检测到 git，请先安装 git 后重试', true)
+      await this.reply('未检测到 git，请先安装 git 后重试')
       return true
     }
 
-    await this.reply('开始下载/更新静态资源包，请稍候…（约 600MB，首次较慢）', true)
+    await this.reply('开始下载/更新静态资源包，请稍候…（约 600MB，首次较慢）')
     await this.syncResourcePack()
     return true
   }
@@ -242,7 +260,7 @@ export class MaiManage extends plugin {
   async autoSyncAssets() {
     if (!Config.getUserCfg('config', 'autoUpdateAssets')) return
     if (!(await hasGit())) return
-    await this.reply('按「自动更新资源」配置检查静态资源包…', true)
+    await this.reply('按「自动更新资源」配置检查静态资源包…')
     await this.syncResourcePack()
   }
 
@@ -257,7 +275,7 @@ export class MaiManage extends plugin {
     try {
       r = await syncAssets({ dir })
     } catch (error) {
-      await this.reply(this.gitErrText(error, '资源包'), true)
+      await this.reply(this.gitErrText(error, '资源包'))
       return
     } finally {
       syncingRes = false
@@ -265,11 +283,11 @@ export class MaiManage extends plugin {
 
     // 远端为空：clone 会成功但拿不到任何提交（见 lib/resourcePack.js 的 empty 说明）
     if (r.empty) {
-      await this.reply(`远程资源仓库还没有 main 分支（资源尚未推送）。\n仓库地址：${r.url}`, true)
+      await this.reply(`远程资源仓库还没有 main 分支（资源尚未推送）。\n仓库地址：${r.url}`)
       return
     }
     if (!r.changed) {
-      await this.reply(`静态资源包已是最新（曲绘 ${r.covers.after} 张）`, true)
+      await this.reply(`静态资源包已是最新（曲绘 ${r.covers.after} 张）`)
       return
     }
 
@@ -278,7 +296,6 @@ export class MaiManage extends plugin {
     await this.reply(
       `静态资源包${verb}完成：曲绘 ${r.covers.before} → ${r.covers.after} 张（${added >= 0 ? '+' : ''}${added}）\n`
       + `耗时 ${(r.elapsedMs / 1000).toFixed(1)} 秒，资源来源 ${r.url}`,
-      true,
     )
   }
 
@@ -293,34 +310,44 @@ export class MaiManage extends plugin {
     }
   }
 
-  /** 自 oldCommit 起的新提交日志（合并提交跳过；合并转发失败降级文本） */
-  async commitLogs(oldCommit, e) {
+  /**
+   * 自 oldCommit 起的新提交日志（合并提交跳过；合并转发失败降级文本）
+   * 对齐 phi-plugin 的重启判断：提交信息带 √/✓ 视为热更安全（资源/数据类改动），
+   * 只要有一条新提交未标记，就返回 true（需重启生效）。
+   * @param {string} [dir] 插件仓库目录（默认 pluginRoot，测试注入临时仓库用）
+   * @returns {Promise<boolean>} 是否需要重启 Bot 应用本次更新
+   */
+  async commitLogs(oldCommit, e, dir = pluginRoot) {
     let logAll
     try {
       logAll = await git(
-        `git -C ${shellPath(pluginRoot)} log -20 --oneline --pretty=format:"%h||[%cd] %s" --date=format:"%m-%d %H:%M"`,
+        `git -C ${shellPath(dir)} log -20 --oneline --pretty=format:"%h||[%cd] %s" --date=format:"%m-%d %H:%M"`,
       )
     } catch (error) {
       logger?.error?.('[mai-plugin] 更新日志获取失败：', error.message)
-      return
+      return false
     }
+    let needRestart = false
     const log = []
     for (const line of logAll.split('\n')) {
       const [hash, rest] = line.split('||')
       if (hash === oldCommit) break
       if (!rest || rest.includes('Merge branch')) continue
       log.push(rest)
+      if (!(rest.includes('√') || rest.includes('✓'))) needRestart = true
     }
-    if (!log.length) return
+    if (!log.length) return false
     log.reverse()
     log.unshift(`更新日志，共 ${log.length} 条`)
     try {
       const common = (await import('../../../lib/common/common.js')).default
+      // 合并转发不支持引用回复：带引用会多发一条空引用消息
       const fwd = await common.makeForwardMsg(e, log)
-      await this.reply(fwd, true)
+      await this.reply(fwd)
     } catch {
-      await this.reply(log.join('\n'), true)
+      await this.reply(log.join('\n'))
     }
+    return needRestart
   }
 
   /**

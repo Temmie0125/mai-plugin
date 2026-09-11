@@ -129,7 +129,7 @@ export class MaiTable extends plugin {
     if (!(await ensureReady(e))) return true
     const rating = (e.msg.match(REG_TABLE()) || [])[1]
     if (!rating) {
-      await this.reply('请输入定数，例如「#mai table 13」。', true)
+      await this.reply(`请输入定数，例如「#${H()} table 13」。`, true)
       return true
     }
     // 源LEVEL_LIST[:6] —— lv1-6 无定数表

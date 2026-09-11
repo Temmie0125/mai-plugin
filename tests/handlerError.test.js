@@ -13,12 +13,12 @@ import assert from 'node:assert/strict'
 test('水鱼 user not exists：双成因引导 + bind df 替代路径', async () => {
   const { errorMessage, USER_NOT_EXISTS } = await import('../lib/handlerError.js')
   const { UserNotExistsError } = await import('../lib/client/errors.js')
-  assert.equal(errorMessage(new UserNotExistsError()), USER_NOT_EXISTS)
-  assert.match(USER_NOT_EXISTS, /未在水鱼查分器找到该 QQ 号对应的玩家/)
-  assert.match(USER_NOT_EXISTS, /注册水鱼查分器或未导入成绩/)
-  assert.match(USER_NOT_EXISTS, /diving-fish\.com\/maimaidx\/prober\//)
-  assert.match(USER_NOT_EXISTS, /未在查分器内绑定该 QQ 号/)
-  assert.match(USER_NOT_EXISTS, /#mai bind df[\s\S]*不依赖查分器内的 QQ 号绑定/)
+  assert.equal(errorMessage(new UserNotExistsError()), USER_NOT_EXISTS())
+  assert.match(USER_NOT_EXISTS(), /未在水鱼查分器找到该 QQ 号对应的玩家/)
+  assert.match(USER_NOT_EXISTS(), /注册水鱼查分器或未导入成绩/)
+  assert.match(USER_NOT_EXISTS(), /diving-fish\.com\/maimaidx\/prober\//)
+  assert.match(USER_NOT_EXISTS(), /未在查分器内绑定该 QQ 号/)
+  assert.match(USER_NOT_EXISTS(), /#mai bind df[\s\S]*不依赖查分器内的 QQ 号绑定/)
 })
 
 test('落雪 403：隐私三选项在前、BOT 侧令牌排查在后', async () => {
@@ -41,6 +41,7 @@ test('既有映射不受影响：错误类别仍各归其位', async () => {
     DivingFishUserNotFoundError, DivingFishNotAuthorizedError, MusicNotPlayError,
   } = await import('../lib/client/errors.js')
   assert.equal(errorMessage(new DivingFishUserNotFoundError()), NOTFOUNDUSER)
-  assert.equal(errorMessage(new DivingFishNotAuthorizedError()), NOTAUTHORIZED)
+  assert.equal(errorMessage(new DivingFishNotAuthorizedError()), NOTAUTHORIZED())
+  assert.match(NOTAUTHORIZED(), /请发送「#mai bind df」/)
   assert.equal(errorMessage(new MusicNotPlayError()), '您未游玩过曲目。')
 })

@@ -98,7 +98,7 @@ export class MaiPush extends plugin {
     if (!groups.length) {
       await this.reply(
         '未能取到任何群列表（当前适配器可能未实现 getGroupList）。\n'
-        + '请改用群内「#mai push on」逐群开启。',
+        + `请改用群内「#${H()} push on」逐群开启。`,
         true,
       )
       return true

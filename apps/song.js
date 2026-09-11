@@ -514,7 +514,7 @@ export class MaiAlias extends plugin {
     const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
     if (!got) return null
     if (!hasNumericQq(got.user)) {
-      await this.reply(ALIAS_QQ_HINT, true)
+      await this.reply(ALIAS_QQ_HINT(), true)
       return null
     }
     return got.user.qqid

@@ -247,3 +247,54 @@ test('gitErrText：主体不同则补救建议不同（插件可强制更新，�
   assert.match(inst.gitErrText(netErr, '资源包'), /assetsRepo 改填代理前缀地址/)
   assert.doesNotMatch(inst.gitErrText(netErr, '资源包'), /强制更新/)
 })
+
+/** 造一个带历史提交的插件仓库（模拟「更新后」的 HEAD 状态），返回首提交短 hash */
+function seededRepo(root) {
+  const repo = path.join(root, 'plugin')
+  fs.mkdirSync(repo, { recursive: true })
+  git(['init', repo], repo)
+  const commit = message => {
+    fs.writeFileSync(path.join(repo, 'f.txt'), String(Math.random()))
+    git(['add', '-A'], repo)
+    git(['-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-m', message], repo)
+  }
+  commit('init')
+  const first = git(['rev-parse', '--short', 'HEAD'], repo).trim()
+  return { repo, first, commit }
+}
+
+test('commitLogs：新提交未带 √/✓ 标记 ⇒ 返回 true（需重启）', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-manage-log-'))
+  const { repo, first, commit } = seededRepo(root)
+  commit('修复某命令逻辑')
+
+  const inst = new MaiManage()
+  const replies = []
+  inst.reply = async m => replies.push(typeof m === 'string' ? m : '…')
+  const e = { reply: async () => {} }
+
+  assert.equal(await inst.commitLogs(first, e, repo), true, '存在未标记提交应要求重启')
+  assert.match(replies.join('\n'), /更新日志，共 1 条/)
+  assert.match(replies.join('\n'), /修复某命令逻辑/)
+})
+
+test('commitLogs：新提交全带 √ 标记 ⇒ 返回 false（热更即可）', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-manage-log-'))
+  const { repo, first, commit } = seededRepo(root)
+  commit('更新曲库数据 √')
+
+  const inst = new MaiManage()
+  inst.reply = async () => {}
+  assert.equal(await inst.commitLogs(first, { reply: async () => {} }, repo), false)
+})
+
+test('commitLogs：oldCommit 之后无新提交 ⇒ 不发日志、返回 false', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-manage-log-'))
+  const { repo, first } = seededRepo(root)
+
+  const inst = new MaiManage()
+  const replies = []
+  inst.reply = async m => replies.push(typeof m === 'string' ? m : '…')
+  assert.equal(await inst.commitLogs(first, { reply: async () => {} }, repo), false)
+  assert.equal(replies.length, 0, '无新提交不应发任何日志')
+})
