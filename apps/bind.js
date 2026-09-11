@@ -29,6 +29,7 @@ const H = () => head()
 const REG_BIND_LXNS = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`)
 const REG_BIND_DF = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`)
 const REG_BIND_QQ = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`)
+const REG_BIND = () => new RegExp(`^[#/]${H()}\\s*(?:bind|绑定)\\s*$`)
 const REG_UNBIND = () => new RegExp(`^[#/]${H()}\\s*(?:unbind|解绑)(?:\\s+(\\S+))?$`)
 const REG_SOURCE = () => new RegExp(`^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`)
 const REG_THEME = () => new RegExp(`^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`)
@@ -58,7 +59,8 @@ function resolveThemeArg(arg) {
 // ===================== 文案（源 mai_base.py:40-111 逐条 1:1；「lxbind」收编为当前子命令写法） =====================
 const LXNS_BIND_CMD = () => `#${H()} bind lxns`
 
-function authorizeMsg(cfg) {
+/** 落雪绑定引导文案（导出供单测锁值，同 classifyBindError 先例） */
+export function authorizeMsg(cfg) {
   const url = buildAuthorizeUrl(cfg.lxClientId, cfg.lxRedirectUri)
   return [
     `请完成落雪账号绑定：`,
@@ -73,14 +75,26 @@ function authorizeMsg(cfg) {
     '本次绑定有效期为 10 分钟，授权码只能使用一次；',
     `超时或失效后请重新发送「${LXNS_BIND_CMD()}」获取授权链接`,
     '=======================',
-    '请注意！！您必须在落雪查分器的',
-    '「账号设置 -> 常规设置」中的',
-    '「隐私设置」开启允许读取成绩，否',
-    '则BOT将无法查询您的成绩',
+    '请注意！！您必须在落雪查分器',
+    '「账号设置 → 隐私设置」中开启以下三个选项，',
+    '否则BOT将无法获取您的落雪数据：',
+    '・允许读取玩家信息',
+    '・允许读取谱面成绩',
+    '・允许读取历史成绩',
   ].join('\n')
 }
 
 const LXNS_ERROR = 'BOT管理员尚未配置落雪查分器相关信息'
+
+/** 裸 `#mai bind`（不带参数）的绑定类型引导 */
+const BIND_GUIDE = [
+  '请指定要绑定的类型：',
+  `・#${H()} bind lxns —— 绑定落雪查分器（授权后可查询/切换到落雪数据源）`,
+  `・#${H()} bind df —— 绑定水鱼查分器（授权后 BOT 可代查您的水鱼成绩）`,
+  `・#${H()} bind qq <QQ号> —— 官方QQBot 环境补充游戏 QQ（解锁水鱼查询）`,
+  `・#${H()} unbind <lxns|df|qq> 解除绑定 · #${H()} source 切换数据源`,
+].join('\n')
+
 const GROUP_BIND_GUIDE = [
   'BOT 管理员已将落雪绑定设置为仅私聊。',
   `请添加 Bot 为好友后，在私聊中发送「${LXNS_BIND_CMD()}」开始绑定。`,
@@ -155,6 +169,7 @@ export class MaiBind extends plugin {
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`, fnc: 'bindLxnsCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`, fnc: 'bindDfCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`, fnc: 'bindQqCmd' },
+        { reg: `^[#/]${H()}\\s*(?:bind|绑定)\\s*$`, fnc: 'bindGuide' },
         { reg: `^[#/]${H()}\\s*(?:unbind|解绑)(?:\\s+(\\S+))?$`, fnc: 'unbindCmd' },
         { reg: `^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`, fnc: 'switchSource' },
         { reg: `^[#/]${H()}\\s*(?:theme|主题)(?:\\s+(\\S+))?$`, fnc: 'switchTheme' },
@@ -206,6 +221,14 @@ export class MaiBind extends plugin {
       logger.warn(`[mai-plugin] 水鱼授权发起失败：${error?.name || error?.message}`)
       await this.reply(DIVINGFISH_BIND_FAILED_MSG, true)
     }
+    return true
+  }
+
+  /**
+   * 裸 `#mai bind`（不带参数）：绑定类型引导（此前该形态不匹配任何规则、无任何回复）
+   */
+  async bindGuide(e) {
+    await this.reply(BIND_GUIDE, true)
     return true
   }
 

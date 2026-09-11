@@ -85,9 +85,12 @@ test('bind 规则：命中/拒收样例', async () => {
   ]) {
     assert.ok(hit(msg).length === 1, `应唯一命中：${msg}`)
   }
-  for (const msg of ['#maibindlxns', '#mai bind', '#mai sourcex', 'bind lxns', '#mai song 1', '#mai bind qqabc']) {
+  for (const msg of ['#maibindlxns', '#mai sourcex', 'bind lxns', '#mai song 1', '#mai bind qqabc']) {
     assert.equal(hit(msg).length, 0, `不应命中：${msg}`)
   }
+  // 裸 bind / 绑定（不带参数）→ 绑定类型引导（此前该形态不匹配任何规则、无回复）
+  assert.deepEqual(hit('#mai bind'), ['bindGuide'])
+  assert.deepEqual(hit('#mai 绑定'), ['bindGuide'])
   // bind qq（官方QQBot 补充游戏 QQ）
   for (const msg of ['#mai bind qq 114514', '#mai 绑定QQ 114514', '#mai bind qq', '#mai 绑定qq 1']) {
     assert.deepEqual(hit(msg), ['bindQqCmd'], `应命中 bindQqCmd：${msg}`)
@@ -98,6 +101,29 @@ test('bind 规则：命中/拒收样例', async () => {
   assert.match(classifyBindError(new ApiError('网络请求失败')), /暂时失败/)
   assert.match(classifyBindError(new UnknownError()), /暂时失败/)
   assert.match(classifyBindError(new Error('写盘失败')), /暂时失败/)
+})
+
+// ---- 裸 bind 引导与落雪授权隐私三选项 ----
+test('bindGuide 行为：裸 #mai bind 回绑定类型引导', async () => {
+  const { MaiBind } = await import('../apps/bind.js')
+  const inst = new MaiBind()
+  const replies = []
+  inst.reply = async m => replies.push(String(m))
+  await inst.bindGuide({ msg: '#mai bind' })
+  const text = replies.join('\n')
+  for (const kw of ['bind lxns', 'bind df', 'bind qq', 'unbind', 'source']) {
+    assert.match(text, new RegExp(kw.replace(/ /g, '\\s+')), `引导应包含 ${kw}`)
+  }
+})
+
+test('落雪授权文案：隐私设置三选项齐全（绑定期就提醒，而非报错后才知）', async () => {
+  const { authorizeMsg } = await import('../apps/bind.js')
+  const text = authorizeMsg({ lxClientId: 'cid-123', lxRedirectUri: 'https://bot.example/cb' })
+  assert.match(text, /maimai\.lxns\.net\/oauth\/authorize/)
+  assert.match(text, /账号设置 → 隐私设置/, '隐私设置入口路径应写明')
+  for (const opt of ['允许读取玩家信息', '允许读取谱面成绩', '允许读取历史成绩']) {
+    assert.ok(text.includes(opt), `授权文案缺少选项：${opt}`)
+  }
 })
 
 // ---- rank 文本纯函数（lib/handler.js）----
