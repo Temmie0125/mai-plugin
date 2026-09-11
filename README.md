@@ -33,7 +33,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai table <定数> / plate <条件或版本称号> / plateinfo / progress / list
 #mai bind lxns|df|qq / unbind <lxns|df|qq> / source / theme
 #mai guess / guessill / letter（开字母）/ fortune（今日舞萌）/ rand / rise
-#   游戏进行中：开 <一个字符> 翻牌 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
+#   游戏进行中：开 <一个字符> 翻开所有该字符 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
 #mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票
 #   / alias local <ID> <别名> 本地别名 / alias sync 更新别名库
 #mai push on|off 群别名推送开关 / push global on|off 全局（仅主人）
@@ -42,7 +42,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 
 口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表` 等。
 
-> 相比原插件的行为变化：查歌族统一收编为 `#mai <子命令>`（`song` 精确出详情卡，`search` 检索出列表——对齐 phi-plugin 的 search 心智）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；`update` 一词刻意避开，数据同步用 `#mai sync`。
+> 相比原插件的行为变化：所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；数据同步用 `#mai sync`，以避开 `update` 一词在系统更新语境下的歧义。
 
 > `#mai fsline`：单曲分数线成图，内含「分数线 / DX 等级 / 目标评级 / BREAK 等效数量」四张表，全部由谱面物量（各判定音符数）推出、与达成率无关；带达成率时在图外附加一行该达成率下的容错文本。难度色与曲名顺序可互换（`紫799` / `799 紫`），达成率可省略（只出图）。`#mai fsline 帮助` 查看详细用法。
 
@@ -65,7 +65,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 #mai download      # 或 #mai 下载资源
 ```
 
-首次执行自动克隆资源仓库 `https://github.com/Temmie0125/mai-plugin-resource-static.git`；之后再次执行即为**增量更新**（已是最新会直接回执，不会重复下载）。若 `resources/static/` 下已手工放好资源包（下方两条迁移途径），命令会**就地接管**该目录、只补差异，不会重下 600MB；目录内的 `data/` 不会被清除，迁移用户的 `user.db` 与曲库缓存均保留。
+首次执行自动克隆资源仓库 `https://github.com/Temmie0125/mai-plugin-resource-static.git`；之后再次执行即为**增量更新**（已是最新会直接回执，不会重复下载）。若 `resources/static/` 下已手工放好资源包（下方两条迁移途径），命令会**就地更新**该目录，只下载缺失或变更的文件，不会重新下载 600MB；目录内的 `data/` 不会被清除，迁移用户的 `user.db` 与曲库缓存均保留。
 
 也可以先手工放好资源包、再执行一次 `#mai download` 接管：
 
@@ -81,7 +81,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 国内直连 GitHub 不畅时，把配置项 `assetsRepo` 改填代理前缀地址即可，例如 `https://gh-proxy.com/https://github.com/Temmie0125/mai-plugin-resource-static.git`。
 
-启动时自动检测：曲绘数 < 500 会红字告警并引导。缺失单项素材渲染时在线回退（可配 `assetsOnline`）。
+启动时自动检测：曲绘数 < 500 会红字警告并引导用户下载完整资源。缺失单项素材渲染时在线回退（可配 `assetsOnline`）。
 
 ## 配置
 
@@ -131,7 +131,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 曲库默认**每日 05:30 自动同步**一次。主人可随时用 `#mai sync`（别名 `更新曲库` / `数据更新`）手动同步；不需要自动同步就把配置项 `autoSync` 关掉，改为纯手动。
 
 > [!IMPORTANT]
-> 若在宿主 `config/config/bot.yaml` 里启用了**定时更新**（`update_cron`）或**间隔更新**（`update_time`），请把本插件的 `autoSyncTime` 与之**错开**，避免同步进行到一半被宿主重启打断。特别注意 `update_time` 是「启动后 N 分钟」的间隔模式，触发时刻**不可预测**，靠挑时间躲不掉——因此本插件的写盘一律采用**原子替换**（先写 `.tmp` 再 rename），被任何来源的重启打断都不会留下截断的缓存文件。
+> 若在宿主 `config/config/bot.yaml` 里启用了**定时更新**（`update_cron`）或**间隔更新**（`update_time`），请把本插件的 `autoSyncTime` 与之**错开**，避免同步进行到一半被宿主重启打断。特别注意 `update_time` 是「启动后 N 分钟」的间隔模式，触发时刻**随启动时间浮动**，无法通过选定一个固定时间点来规避——因此本插件的写盘一律采用**原子替换**（先写 `.tmp` 再 rename），被任何来源的重启打断都不会留下截断的缓存文件。
 
 ## 美术与版权声明（必读）
 
@@ -144,9 +144,9 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 ### 调试数据安全（重要）
 
-- 任何离线脚本/调试驱动若 import `lib/database.js`，**必须**先 `setDataRoot(临时目录)`——
-  直接读写真机 `data/` 会导致用户绑定凭据被旧快照覆盖（lxns 401 刷新后的新 refresh_token
-  一旦被旧值回退即不可逆失效，服务端已轮换）。
+- 任何离线脚本/调试驱动若 import `lib/database.js`，**必须**先 `setDataRoot(临时目录)`，
+  否则会直接读写真机 `data/`，导致用户绑定凭据被旧快照覆盖（lxns 401 刷新后获取的新 refresh_token
+  一旦被旧值回退即不可逆失效，服务端已轮换旧token，无法恢复）。
 - `lib/database.js` 已内置三道防护：行级 read-merge-write（磁盘为全集，尊重外部新增/删除）、
   凭据空值不回退（accessToken/refreshToken/friendCode）、写前时间戳备份轮转
   （`user.json.<yyyymmddHHmmss>.bak`，保留最近 10 份，可用于人工回溯）。
@@ -178,7 +178,7 @@ node plugins/mai-plugin/tests/render-fsline.mjs    # 渲染冒烟 → tests/out/
 - 保留 `MIT-nonebot-plugin-maimaidx.txt` 或等价文件中的 MIT 许可与原始版权声明；
 - 标明本项目对 `nonebot-plugin-maimaidx` 的移植、修改关系；
 - 若分发二进制、打包资源或其他非源码形式，应按 GPL-3.0 向接收者提供对应源代码；
-- 商业使用可以，但不得通过闭源方式规避 GPL-3.0 的源码开放要求；MIT 部分仍需保留署名与许可声明；
+- 可以商业使用，但不得通过闭源方式规避 GPL-3.0 的源码开放要求；MIT 部分仍需保留署名与许可声明；
 - 舞萌DX 相关素材、字体等第三方资源的版权限制，详见上文“美术与版权声明”。
 
 本项目按“现状”提供，不提供任何明示或默示担保。以上内容仅为许可证说明，不构成法律意见；如有疑问，请咨询专业律师。
