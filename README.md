@@ -25,18 +25,26 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 指令前缀 `#` 或 `/` 均可触发；命令头默认 `mai`，可在配置中修改。发送 `#mai help` 查看完整帮助图。
 
 ```
-#mai b50 / ap50 / score <曲名> / ginfo / song <曲名|ID> / search <关键词> / what <词>
+#mai b50 / ap50 / score <曲名> / ginfo <曲名> / rank <用户名|页码> / myrank
+#mai song <曲名|ID> / search <关键词> / what <词>
 #   检索语法：search 定数14+ / 定数14-15 / bpm200-300（区间用 - 或 ~，尾部数字为页码）
-#mai table <定数> / plate <条件或版本称号> / progress / list
+#mai fsline [难度色]<曲名|ID|别名> [达成率]
+#   分数线成图（四张表全由物量推出）；难度色与曲名顺序可互换，达成率可省略
+#mai table <定数> / plate <条件或版本称号> / plateinfo / progress / list
 #mai bind lxns|df|qq / unbind <lxns|df|qq> / source / theme
-#mai guess / guessill / fortune / rand / rise
-#mai alias … / push on|off / sync
-#mai 更新 / 强制更新（仅主人）
+#mai guess / guessill / letter（开字母）/ fortune（今日舞萌）/ rand / rise
+#   游戏进行中：开 <一个字符> 翻牌 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
+#mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票
+#   / alias local <ID> <别名> 本地别名 / alias sync 更新别名库
+#mai push on|off 群别名推送开关 / push global on|off 全局（仅主人）
+#mai 更新 / 强制更新 / download（资源包）/ sync（曲库）—— 均仅主人
 ```
 
-口语指令（无需前缀）保留：`来首紫14`、`XX是什么歌`、`我要上20分`、`XX有什么别名` 等。
+口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表` 等。
 
 > 相比原插件的行为变化：查歌族统一收编为 `#mai <子命令>`（`song` 精确出详情卡，`search` 检索出列表——对齐 phi-plugin 的 search 心智）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；`update` 一词刻意避开，数据同步用 `#mai sync`。
+
+> `#mai fsline`：单曲分数线成图，内含「分数线 / DX 等级 / 目标评级 / BREAK 等效数量」四张表，全部由谱面物量（各判定音符数）推出、与达成率无关；带达成率时在图外附加一行该达成率下的容错文本。难度色与曲名顺序可互换（`紫799` / `799 紫`），达成率可省略（只出图）。`#mai fsline 帮助` 查看详细用法。
 
 ## 安装与资源
 
@@ -94,9 +102,10 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 > [!NOTE]
 > 使用落雪 OAuth 绑定时，可在群聊或私聊发送 `#mai bind lxns`，按提示完成授权后发送授权码或完整回调链接；群聊发起的绑定也可以转到同一 Bot 的私聊完成。若设置 `lxnsBindPrivateOnly=true`，群聊只会提示用户添加 Bot 好友后前往私聊。部分 OneBot 实现无法接收陌生人的私聊消息，因此该选项默认关闭。
 > 您在申请落雪 OAuth 应用时，OAuth 权限范围请选择前三项，不包括「读取个人API秘钥」。权限不足本插件对应功能将无法工作。
+> 绑定后还需在落雪查分器「账号设置 → 隐私设置」中开启「允许读取玩家信息」「允许读取谱面成绩」「允许读取历史成绩」三项，否则 BOT 无法获取您的落雪数据（查询被拒时回复中也会给出此引导）。
 
 > [!NOTE]
-> 插件带有别名更新推送功能，默认关闭全部群组推送，仅白名单群聊会启用。如有需要请在对应群内使用指令 `#mai alias push on`（需要管理员权限）。
+> 插件带有别名更新推送功能，默认关闭全部群组推送，仅白名单群聊会启用。如有需要请在对应群内使用指令 `#mai push on`（需要管理员或群主）；`#mai push global on` 为全局开关（仅主人）。
 
 
 ## 插件更新
@@ -150,6 +159,9 @@ cd <Yunzai根>
 node plugins/mai-plugin/tests/render-pages.mjs     # JS 出图 → tests/out/*.jpg
 node plugins/mai-plugin/tests/refs/make_refs.py    # 源 NoneBot PIL 参照图（需 venv python）
 node plugins/mai-plugin/tests/refs/compare.py      # 数值比对报告
+# 分数线海报：
+node plugins/mai-plugin/tests/render-fsline.mjs    # 渲染冒烟 → tests/out/fsline.png
+# 四表算法的对照基准由 tests/refs/gen-fsline-ref.mjs 真跑用户样板生成（fsline_ref.json 已入库，无需样板）
 ```
 
 ## 许可
