@@ -29,6 +29,7 @@ let parseFslineArgs = null
 let fslineText = null
 let FSLINE_HELP = null
 let FSLINE_FORMAT_ERROR = null
+let FSLINE_ARGS_ERRORS = null
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const REF = JSON.parse(fs.readFileSync(path.join(__dirname, 'refs', 'fsline_ref.json'), 'utf8'))
@@ -151,49 +152,69 @@ test('对照样板：六组物量 × 四张表逐格一致', () => {
 
 test('准备：载入 apps/global.js 与 lib/handler.js（命令层）', async () => {
   ({ MaiGlobal, parseFslineArgs } = await import('../apps/global.js'));
-  ({ fslineText, FSLINE_HELP, FSLINE_FORMAT_ERROR } = await import('../lib/handler.js'))
+  ({ fslineText, FSLINE_HELP, FSLINE_FORMAT_ERROR, FSLINE_ARGS_ERRORS } = await import('../lib/handler.js'))
 })
 
 test('参数解析（达成率给了）：末 token 是数字 → line 取该数', () => {
-  assert.deepEqual(parseFslineArgs('紫799 100'), { levelIndex: 3, query: '799', line: 100 })
-  assert.deepEqual(parseFslineArgs('紫799 99.5'), { levelIndex: 3, query: '799', line: 99.5 })
+  assert.deepEqual(parseFslineArgs('紫799 100'), { ok: true, levelIndex: 3, query: '799', line: 100 })
+  assert.deepEqual(parseFslineArgs('紫799 99.5'), { ok: true, levelIndex: 3, query: '799', line: 99.5 })
   // 颜色与曲名之间允许空格（源靠 `\s?`，此处同等宽）；曲名含空格时只吞末 token
-  assert.deepEqual(parseFslineArgs('紫 799 100'), { levelIndex: 3, query: '799', line: 100 })
+  assert.deepEqual(parseFslineArgs('紫 799 100'), { ok: true, levelIndex: 3, query: '799', line: 100 })
   assert.deepEqual(
     parseFslineArgs('紫 PANDORA PARADOX 100'),
-    { levelIndex: 3, query: 'PANDORA PARADOX', line: 100 },
+    { ok: true, levelIndex: 3, query: 'PANDORA PARADOX', line: 100 },
   )
   // 五色 → levelIndex 0..4（白 = Re:Master）
   for (const [color, levelIndex] of [['绿', 0], ['黄', 1], ['红', 2], ['紫', 3], ['白', 4]]) {
-    assert.deepEqual(parseFslineArgs(`${color}测试曲 90`), { levelIndex, query: '测试曲', line: 90 }, color)
+    assert.deepEqual(
+      parseFslineArgs(`${color}测试曲 90`),
+      { ok: true, levelIndex, query: '测试曲', line: 90 }, color,
+    )
   }
 })
 
-test('参数解析（达成率可省）：末 token 非数 → line=null、token 并入曲名', () => {
-  assert.deepEqual(parseFslineArgs('紫799'), { levelIndex: 3, query: '799', line: null }, '帮助示例的「只出图」形态')
-  assert.deepEqual(parseFslineArgs('紫 freesia'), { levelIndex: 3, query: 'freesia', line: null })
-  // 末 token 非数 ⇒ 整段当曲名查（下游回「未找到曲目」，不再报格式错误）
-  assert.deepEqual(parseFslineArgs('紫799 abc'), { levelIndex: 3, query: '799 abc', line: null })
-  // 颜色前缀使 parseFloat 失败：`紫99.5` 是曲名 99.5，不会被当成「无曲名的达成率」
-  assert.deepEqual(parseFslineArgs('紫99.5'), { levelIndex: 3, query: '99.5', line: null })
+test('参数解析（难度色与曲名顺序可互换）：色字作为末尾独立 token', () => {
+  // 用户反馈形态：`#fsline 300绝赞 紫`
+  assert.deepEqual(parseFslineArgs('799 紫'), { ok: true, levelIndex: 3, query: '799', line: null })
+  assert.deepEqual(parseFslineArgs('300绝赞 紫'), { ok: true, levelIndex: 3, query: '300绝赞', line: null })
+  assert.deepEqual(
+    parseFslineArgs('PANDORA PARADOX 紫 100'),
+    { ok: true, levelIndex: 3, query: 'PANDORA PARADOX', line: 100 },
+  )
+  assert.deepEqual(parseFslineArgs('799 白 100'), { ok: true, levelIndex: 4, query: '799', line: 100 })
+  // 色字必须是**整 token**：融合在曲名末尾（`绝赞紫`）不当作难度色——否则会吞以色字结尾的曲名
+  assert.deepEqual(parseFslineArgs('绝赞紫'), { ok: false, reason: 'missingColor' })
 })
 
-test('参数解析（拒收）：缺难度色 / 只有色无曲名 / 空 → null（命令层回格式错误）', () => {
-  assert.equal(parseFslineArgs('799 100'), null, '缺难度色')
-  assert.equal(parseFslineArgs('紫'), null, '只有色、无曲名')
-  for (const v of ['', '   ', undefined, null]) {
-    assert.equal(parseFslineArgs(v), null, `raw=${JSON.stringify(v)}`)
+test('参数解析（达成率可省）：末 token 非数 → line=null、token 并入曲名', () => {
+  assert.deepEqual(parseFslineArgs('紫799'), { ok: true, levelIndex: 3, query: '799', line: null }, '帮助示例的「只出图」形态')
+  assert.deepEqual(parseFslineArgs('紫 freesia'), { ok: true, levelIndex: 3, query: 'freesia', line: null })
+  // 末 token 非数 ⇒ 整段当曲名查（下游回「未找到曲目」，不再报格式错误）
+  assert.deepEqual(parseFslineArgs('紫799 abc'), { ok: true, levelIndex: 3, query: '799 abc', line: null })
+  // 颜色前缀使 parseFloat 失败：`紫99.5` 是曲名 99.5，不会被当成「无曲名的达成率」
+  assert.deepEqual(parseFslineArgs('紫99.5'), { ok: true, levelIndex: 3, query: '99.5', line: null })
+})
+
+test('参数解析（拒收带原因）：空/只有达成率 → usage，只色无曲名 → missingQuery，无色字 → missingColor', () => {
+  for (const v of ['', '   ', undefined, null, '100']) {
+    assert.deepEqual(parseFslineArgs(v), { ok: false, reason: 'usage' }, `raw=${JSON.stringify(v)}`)
+  }
+  for (const v of ['紫', '紫 100', '白 100']) {
+    assert.deepEqual(parseFslineArgs(v), { ok: false, reason: 'missingQuery' }, `raw=${JSON.stringify(v)}`)
+  }
+  for (const v of ['799 100', '绝赞', 'loop 100']) {
+    assert.deepEqual(parseFslineArgs(v), { ok: false, reason: 'missingColor' }, `raw=${JSON.stringify(v)}`)
   }
 })
 
 test('参数解析（口径锁定）：末 token 是数字就吞，曲名以数字结尾需改用 id/别名查询', () => {
   // JS parseFloat 比 Python float() 宽（吃前缀数字）：'100%' → 100——源会把 '100%' 当曲名
-  assert.deepEqual(parseFslineArgs('紫799 100%'), { levelIndex: 3, query: '799', line: 100 })
+  assert.deepEqual(parseFslineArgs('紫799 100%'), { ok: true, levelIndex: 3, query: '799', line: 100 })
   // 曲名末词为数字会被当成达成率：「末 token 是数即达成率」的既定取舍（源 float(args[-1]) 同位置）
-  assert.deepEqual(parseFslineArgs('紫 loop 100'), { levelIndex: 3, query: 'loop', line: 100 })
+  assert.deepEqual(parseFslineArgs('紫 loop 100'), { ok: true, levelIndex: 3, query: 'loop', line: 100 })
 })
 
-test('命令路径（桩掉 sendFsline，不真渲染）：达成率可省/可给/非数并入曲名', async () => {
+test('命令路径（桩掉 sendFsline，不真渲染）：可省/可给/顺序互换/缺参精确提示', async () => {
   const inst = new MaiGlobal()
   const replies = []
   inst.reply = async (msg) => { replies.push(String(msg)) }
@@ -210,11 +231,32 @@ test('命令路径（桩掉 sendFsline，不真渲染）：达成率可省/可�
   assert.deepEqual(calls.at(-1), [799, 3, 100.5])
   assert.deepEqual(replies, [])
 
+  // 难度色放曲名后（用户反馈形态）
+  await inst.fsline({ msg: '#mai fsline 799 紫 100' })
+  assert.deepEqual(calls.at(-1), [799, 3, 100])
+  assert.deepEqual(replies, [])
+
   // 末 token 非数 ⇒ 并入曲名查不到 → 「未找到曲目」，且不触达出图
   calls.length = 0
   replies.length = 0
   await inst.fsline({ msg: '#mai fsline 紫799 abc' })
   assert.deepEqual(calls, [])
+  assert.deepEqual(replies, ['未找到曲目'])
+
+  // 缺参精确提示：各形态命中对应文案（不再是笼统的格式错误）
+  for (const [msg, reason] of [
+    ['#mai fsline', 'usage'],
+    ['#mai fsline 799 100', 'missingColor'],
+    ['#mai fsline 紫', 'missingQuery'],
+  ]) {
+    replies.length = 0
+    await inst.fsline({ msg })
+    assert.deepEqual(replies, [FSLINE_ARGS_ERRORS[reason]], msg)
+  }
+
+  // id 不存在：格式没错，按查曲失败提示（与曲名查不到同一文案）
+  replies.length = 0
+  await inst.fsline({ msg: '#mai fsline 紫999999 100' })
   assert.deepEqual(replies, ['未找到曲目'])
 })
 
@@ -265,10 +307,11 @@ test('附加文本：难度不存在 / brk==0 → 格式错误文案（源 ZeroD
   assert.doesNotMatch(fslineText(songWith({ tap: 1, brk: 1 }), 0, 100), /Infinity|NaN/)
 })
 
-test('帮助文本：达成率已标可选（只出图/附文本两形态），表体逐字保留源', () => {
+test('帮助文本：达成率可选、顺序可互换均已写明，表体逐字保留源', () => {
   assert.match(FSLINE_HELP, /#mai fsline \[难度色\]<曲名\|id\|别名> \[目标达成率\]/)
   assert.match(FSLINE_HELP, /#mai fsline 紫799 +（只出图）/)
   assert.match(FSLINE_HELP, /#mai fsline 紫799 100 +（出图，并附一行该达成率下的容错文本）/)
+  assert.match(FSLINE_HELP, /#mai fsline 799 紫 100 +（难度色与曲名顺序可互换）/)
   assert.match(FSLINE_HELP, /BREAK {7}5 \/ 12\.5 \/ 25 \(外加200落\)$/)
   assert.match(FSLINE_FORMAT_ERROR, /^格式错误，输入“分数线 帮助”以查看帮助信息$/)
 })

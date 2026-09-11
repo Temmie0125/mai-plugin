@@ -6,8 +6,8 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import { head } from '../lib/config.js'
 import {
-  FSLINE_FORMAT_ERROR, FSLINE_HELP, drawFsline, drawSongGlobalData, fslineText, getRatingRanking,
-  myRatingRankingText, rankListText, rankNameText,
+  FSLINE_ARGS_ERRORS, FSLINE_FORMAT_ERROR, FSLINE_HELP, drawFsline, drawSongGlobalData, fslineText,
+  getRatingRanking, myRatingRankingText, rankListText, rankNameText,
 } from '../lib/handler.js'
 import { toSegment } from '../lib/render/picmodle.js'
 import { mai, ensureReady } from '../lib/service.js'
@@ -42,17 +42,35 @@ function fslineTextSafe(song, levelIndex, line) {
  *
  * **达成率可选**：只有末尾 token 能 parse 成数字时才算它。海报四张表全部只由物量推出、
  * 与达成率无关（见 lib/fsline.js），达成率仅驱动附加的那行文本。
+ * **难度色位置可互换**：色字可融合在曲名前（`紫799`/`紫 799`），也可作为**独立 token** 放在
+ * 末尾（`799 紫`）——后者要求整 token 恰为一个色字，不吞「以色字结尾」的曲名（`绝赞紫`
+ * 仍整体当曲名查）。
  * @param {string} raw 命令头之后、去掉首尾空白的整段
- * @returns {{levelIndex:number, query:string, line:number|null}|null} 解析不出难度色+曲目时 null
+ * @returns {{ok:true, levelIndex:number, query:string, line:number|null}
+ *   | {ok:false, reason:'usage'|'missingQuery'|'missingColor'}} 失败时给原因，供调用方精确提示
  */
 export function parseFslineArgs(raw) {
-  const args = String(raw ?? '').split(/\s+/).filter(Boolean)
-  if (!args.length) return null
-  const last = args[args.length - 1]
+  const tokens = String(raw ?? '').split(/\s+/).filter(Boolean)
+  if (!tokens.length) return { ok: false, reason: 'usage' }
+
+  const last = tokens[tokens.length - 1]
   const hasLine = Number.isFinite(parseFloat(last))
-  const m = (hasLine ? args.slice(0, -1) : args).join(' ').match(/^([绿黄红紫白])\s*(.+)$/)
-  if (!m) return null
-  return { levelIndex: LEVEL_COLORS.indexOf(m[1]), query: m[2].trim(), line: hasLine ? parseFloat(last) : null }
+  const rest = hasLine ? tokens.slice(0, -1) : tokens
+  const line = hasLine ? parseFloat(last) : null
+  if (!rest.length) return { ok: false, reason: 'usage' } // 只给了一个达成率
+
+  // ① 色字在曲名前（可融合）
+  if (LEVEL_COLORS.includes(rest[0][0])) {
+    const query = [rest[0].slice(1), ...rest.slice(1)].join(' ').trim()
+    return query
+      ? { ok: true, levelIndex: LEVEL_COLORS.indexOf(rest[0][0]), query, line }
+      : { ok: false, reason: 'missingQuery' }
+  }
+  // ② 色字是末尾的独立 token（整 token 恰为一个色字）
+  if (rest.length > 1 && /^[绿黄红紫白]$/.test(rest[rest.length - 1])) {
+    return { ok: true, levelIndex: LEVEL_COLORS.indexOf(rest[rest.length - 1]), query: rest.slice(0, -1).join(' ').trim(), line }
+  }
+  return { ok: false, reason: 'missingColor' }
 }
 
 export class MaiGlobal extends plugin {
@@ -164,7 +182,8 @@ export class MaiGlobal extends plugin {
    *  1. 源只认 `<难度色><纯数字id>`；此处把查曲扩展为与 song/score 同一管线（曲名/别名/id），
    *     多候选走既有 pickSong 引导；
    *  2. 达成率**可选**：取最后一个 token 且仅当它能 parse 成数字（海报四表与达成率无关，
-   *     见 lib/fsline.js）；难度色允许空格分隔（源靠 `\s?`）；
+   *     见 lib/fsline.js）；难度色可融合在曲名前（源靠 `\s?`）或作为独立 token 放在曲名后
+   *     （用户反馈的 `799 紫` 习惯形态）；
    *  3. 帮助为纯文本（源走 text_to_bytes_io 转图，设计 §6.4 已废除长文本转图）。
    */
   async fsline(e) {
@@ -178,8 +197,8 @@ export class MaiGlobal extends plugin {
     }
 
     const parsed = parseFslineArgs(raw)
-    if (!parsed) {
-      await this.reply(FSLINE_FORMAT_ERROR, true)
+    if (!parsed.ok) {
+      await this.reply(FSLINE_ARGS_ERRORS[parsed.reason], true)
       return true
     }
     const { levelIndex, query, line } = parsed
@@ -188,7 +207,8 @@ export class MaiGlobal extends plugin {
     if (/^\d+$/.test(query)) {
       const song = mai.totalList.byId(parseInt(query, 10))
       if (!song) {
-        await this.reply(FSLINE_FORMAT_ERROR, true)
+        // 格式没错、只是 id 不存在：按查曲失败提示（与曲名查不到同一文案），不再笼统报格式错误
+        await this.reply('未找到曲目', true)
         return true
       }
       await this.sendFsline(song, levelIndex, line)
@@ -218,7 +238,8 @@ export class MaiGlobal extends plugin {
    */
   async sendFsline(song, levelIndex, line = null) {
     if (levelIndex >= song.difficulties.length) {
-      await this.reply(FSLINE_FORMAT_ERROR, true)
+      // 与 sendGlobal 同文案：格式没错，只是该曲没有这个难度（如无 Re:Master 的曲选了白）
+      await this.reply('该乐曲没有这个等级', true)
       return
     }
 

@@ -149,18 +149,18 @@ body::before {
     background: #310080;
 }
 
-/* 基础：无背景（兜底） */
+/* 基础：无背景（兜底，同 master 色） */
 .cell-dynamic {
-    background: #9B7EDE;   /* 默认紫色 */
+    background: #9f51dc;
     color: #ffffff;
 }
 
-/* 各难度配色 */
-.cell-dynamic.dif-basic    { background: #3DAC1F; }   /* 绿 */
-.cell-dynamic.dif-advanced { background: #FFB600; }   /* 黄 */
-.cell-dynamic.dif-expert   { background: #FF6B64; }   /* 红 */
-.cell-dynamic.dif-master   { background: #9F50DB; }   /* 紫 */
-.cell-dynamic.dif-remaster { background: #E5E5E5; color: #440087; }   /* 白 */
+/* 各难度配色（对齐 help.html 难度色标；样板原色 #3DAC1F/#FFB600/#FF6B64/#9F50DB/#E5E5E5 与全站不一致） */
+.cell-dynamic.dif-basic    { background: #81d955; }   /* 绿 */
+.cell-dynamic.dif-advanced { background: #f5bd15; }   /* 黄 */
+.cell-dynamic.dif-expert   { background: #ff818d; }   /* 红 */
+.cell-dynamic.dif-master   { background: #9f51dc; }   /* 紫 */
+.cell-dynamic.dif-remaster { background: #e6c5ff; color: #440087; }   /* 白（浅紫底，保留深紫字） */
 
 /* ===== 分数表外框 ===== */
 .score-frame-outer {
@@ -758,10 +758,10 @@ body::before {
 
 /* ===== 第 8 格：动态难度（两行，上小下大） ===== */
 .cell-dynamic {
-    background: #9F50DB;        /* 占位背景色，后续由数据决定 */
-    color: #FFF;                /* 文字色，随背景调整对比度 */
-    flex-direction: column;     /* 分两行 */
-    gap: 0px;                   /* 两行间距 */
+    background: #9f51dc;       /* 占位背景色，后续由数据决定 */
+    color: #FFF;               /* 文字色，随背景调整对比度 */
+    flex-direction: column;    /* 分两行 */
+    gap: 0px;                  /* 两行间距 */
 }
 
 .song-dif {
@@ -1030,17 +1030,17 @@ body::before {
       <div class="cell cell-purple touch"><span class="txt">TOUCH</span></div>
       <div class="cell cell-purple break"><span class="txt">BREAK</span></div>
 
-      <!-- 第 2 行 -->
+      <!-- 第 2 行（计数不带括号：样板的 (838) 写法按用户要求去掉） -->
       <div class="cell cell-dynamic song-dif {{diff.cls}}">
           <div class="dif-name">{{diff.name}}</div>
           <div class="dif-value">{{diff.value}}</div>
       </div>
-      <div class="cell cell-white total-count"><span class="txt">({{counts.total}})</span></div>
-      <div class="cell cell-white tap-count"><span class="txt">({{counts.tap}})</span></div>
-      <div class="cell cell-white hold-count"><span class="txt">({{counts.hold}})</span></div>
-      <div class="cell cell-white slide-count"><span class="txt">({{counts.slide}})</span></div>
-      <div class="cell cell-white touch-count"><span class="txt">({{counts.touch}})</span></div>
-      <div class="cell cell-white break-count"><span class="txt">({{counts.break}})</span></div>
+      <div class="cell cell-white total-count"><span class="txt">{{counts.total}}</span></div>
+      <div class="cell cell-white tap-count"><span class="txt">{{counts.tap}}</span></div>
+      <div class="cell cell-white hold-count"><span class="txt">{{counts.hold}}</span></div>
+      <div class="cell cell-white slide-count"><span class="txt">{{counts.slide}}</span></div>
+      <div class="cell cell-white touch-count"><span class="txt">{{counts.touch}}</span></div>
+      <div class="cell cell-white break-count"><span class="txt">{{counts.break}}</span></div>
   </div>
   <div class="score-frame-outer"></div>
 
