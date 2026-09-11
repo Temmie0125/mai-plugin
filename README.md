@@ -42,7 +42,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 
 口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表` 等。
 
-> 相比原插件的行为变化：所有查歌命令统一为为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；数据同步用 `#mai sync`，以避开 `update` 一词在系统更新语境下的歧义。
+> 相比原插件的行为变化：所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；数据同步用 `#mai sync`，以避开 `update` 一词在系统更新语境下的歧义。
 
 > `#mai fsline`：单曲分数线成图，内含「分数线 / DX 等级 / 目标评级 / BREAK 等效数量」四张表，全部由谱面物量（各判定音符数）推出、与达成率无关；带达成率时在图外附加一行该达成率下的容错文本。难度色与曲名顺序可互换（`紫799` / `799 紫`），达成率可省略（只出图）。`#mai fsline 帮助` 查看详细用法。
 
@@ -65,7 +65,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 #mai download      # 或 #mai 下载资源
 ```
 
-首次执行自动克隆资源仓库 `https://github.com/Temmie0125/mai-plugin-resource-static.git`；之后再次执行即为**增量更新**（已是最新会直接回执，不会重复下载）。若 `resources/static/` 下已手工放好资源包（下方两条迁移途径），命令会**就地更新**该目录，只下载缺失或变更的文件，不会重新下载 600MB。；目录内的 `data/` 不会被清除，迁移用户的 `user.db` 与曲库缓存均保留。
+首次执行自动克隆资源仓库 `https://github.com/Temmie0125/mai-plugin-resource-static.git`；之后再次执行即为**增量更新**（已是最新会直接回执，不会重复下载）。若 `resources/static/` 下已手工放好资源包（下方两条迁移途径），命令会**就地更新**该目录，只下载缺失或变更的文件，不会重新下载 600MB；目录内的 `data/` 不会被清除，迁移用户的 `user.db` 与曲库缓存均保留。
 
 也可以先手工放好资源包、再执行一次 `#mai download` 接管：
 
@@ -131,7 +131,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 曲库默认**每日 05:30 自动同步**一次。主人可随时用 `#mai sync`（别名 `更新曲库` / `数据更新`）手动同步；不需要自动同步就把配置项 `autoSync` 关掉，改为纯手动。
 
 > [!IMPORTANT]
-> 若在宿主 `config/config/bot.yaml` 里启用了**定时更新**（`update_cron`）或**间隔更新**（`update_time`），请把本插件的 `autoSyncTime` 与之**错开**，避免同步进行到一半被宿主重启打断。触发时刻**随启动时间浮动**，无法通过选定一个固定时间点来规避——因此本插件的写盘一律采用**原子替换**（先写 `.tmp` 再 rename），被任何来源的重启打断都不会留下截断的缓存文件。
+> 若在宿主 `config/config/bot.yaml` 里启用了**定时更新**（`update_cron`）或**间隔更新**（`update_time`），请把本插件的 `autoSyncTime` 与之**错开**，避免同步进行到一半被宿主重启打断。特别注意 `update_time` 是「启动后 N 分钟」的间隔模式，触发时刻**随启动时间浮动**，无法通过选定一个固定时间点来规避——因此本插件的写盘一律采用**原子替换**（先写 `.tmp` 再 rename），被任何来源的重启打断都不会留下截断的缓存文件。
 
 ## 美术与版权声明（必读）
 
