@@ -87,6 +87,23 @@
     }
     .note { font-size: 16.5px; color: #999; line-height: 1.6; margin-top: 10px; }
 
+    /* ===== 权限/场景徽章：desc 前缀彩色圆角单字块 =====
+       A=需管理员(琥珀) M=需主人(红) G=仅群聊(蓝) P=仅私聊(紫)；颜色与下方 .legend 图例一致 */
+    .tag {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 7px;
+      font-style: normal; font-family: 'mai-torus', 'mai-rounded', sans-serif;
+      font-size: 15px; font-weight: bold; color: #fff;
+      margin-right: 5px; vertical-align: -5px;
+    }
+    .tag.ta { background: #f5a623; }
+    .tag.tm { background: #e8574c; }
+    .tag.tg { background: #3a8fd4; }
+    .tag.tp { background: #9f51dc; }
+    .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; margin-top: 6px; }
+    .legend span { display: inline-flex; align-items: center; font-size: 16px; color: #666; }
+    .legend .tag { margin-right: 7px; }
+
     /* ===== 版权卡：横贯底部通栏（三列等高底部之下） ===== */
     .powered {
       margin-top: 22px;
@@ -124,7 +141,7 @@
         <div class="row">
           <div class="cmd">{{item.title}}</div>
           <div class="info">
-            <div class="desc">{{item.desc}}</div>
+            <div class="desc">{{if item.tags.length}}{{each item.tags t}}<i class="tag {{t.cls}}">{{t.label}}</i>{{/each}}{{/if}}{{item.desc}}</div>
             {{if item.eg}}<div class="eg">{{item.eg}}</div>{{/if}}
           </div>
         </div>
@@ -148,6 +165,15 @@
             <i style="background:#ff818d">红</i>
             <i style="background:#9f51dc">紫</i>
             <i style="background:#e6c5ff">白</i>
+          </div>
+        </div>
+        <div class="kv">
+          <b>权限/场景</b>
+          <div class="legend">
+            <span><i class="tag ta">A</i>需管理员</span>
+            <span><i class="tag tm">M</i>需主人</span>
+            <span><i class="tag tg">G</i>仅群聊</span>
+            <span><i class="tag tp">P</i>仅私聊</span>
           </div>
         </div>
         <div class="note">命令头可在 config.yaml 中修改（cmdhead），改后需重启。<br>口语指令与命令头指令行为一致，无需加前缀。</div>

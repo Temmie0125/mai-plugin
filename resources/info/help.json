@@ -214,17 +214,21 @@
       {
         "title": "alias sync",
         "eg": "#{head} alias sync",
-        "desc": "更新别名库（管理员）"
+        "desc": "更新别名库",
+        "permission": "master"
       },
       {
         "title": "push on|off",
         "eg": "#{head} push on",
-        "desc": "群别名推送开关（群管）"
+        "desc": "群别名推送开关",
+        "permission": "admin",
+        "scene": "group"
       },
       {
         "title": "push global on|off",
         "eg": "#{head} push global on",
-        "desc": "全局别名推送开关（管理员）"
+        "desc": "全局别名推送开关",
+        "permission": "master"
       }
     ]
   },
@@ -234,27 +238,26 @@
       {
         "title": "更新",
         "eg": "#{head} 更新",
-        "desc": "拉取插件更新（仅主人）",
+        "desc": "拉取插件更新",
         "permission": "master"
       },
       {
         "title": "强制更新",
         "eg": "#{head} 强制更新",
-        "desc": "放弃本地改动强制更新（仅主人）",
+        "desc": "放弃本地改动强制更新",
         "permission": "master"
       },
       {
         "title": "download",
         "eg": "#{head} download",
-        "desc": "下载/更新静态资源包（仅主人，同「下载资源」）",
+        "desc": "下载/更新静态资源包（同「下载资源」）",
         "permission": "master"
       },
       {
         "title": "sync",
         "eg": "#{head} sync",
-        "desc": "同步曲库/别名/牌子数据（管理员私聊）",
-        "permission": "admin",
-        "scene": "private"
+        "desc": "同步曲库/别名/牌子数据",
+        "permission": "master"
       },
       {
         "title": "help / 帮助",
