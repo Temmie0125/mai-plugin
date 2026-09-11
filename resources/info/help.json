@@ -38,9 +38,9 @@
         "desc": "根据别名反查歌曲"
       },
       {
-        "title": "fsline [难度色]<曲名|id|别名> <目标达成率>",
+        "title": "fsline <难度色><曲名|id|别名>[目标达成率]",
         "eg": "#{head} fsline 紫799 100",
-        "desc": "计算目标达成率的分数线容错（帮助：#{head} fsline 帮助）"
+        "desc": "计算曲目的分数线容错（帮助：#{head} fsline 帮助）"
       },
       {
         "title": "rank [页码|用户名]",
