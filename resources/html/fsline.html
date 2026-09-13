@@ -717,6 +717,16 @@ body::before {
     top: 228px;
     line-height: 1.05;
     text-align: center;
+    /* 在「&」之后断行。不用伪元素，也不依赖字体度量。
+       靠 width 逼换行是不行的：这句 "niconico & VOCALOID" 要换行，宽度必须落在「恰好放得下
+       niconico &、又放不下整句」的窄区间，而这个区间完全由字体决定 —— 实际字体一变（资源包字体
+       没加载成功、回退系统 sans-serif），临界值就变：要么不换行、要么提前断成三行，于是文字压到
+       右侧 BPM。断点必须是**确定**的，不能由字宽推出来。
+       所以改为在 DOM 上真正断开：由页尾那段小脚本把这个文本节点拆成
+       「niconico &」+ <br> + 「VOCALOID」，换行由 <br> 这个普通元素负责。
+       本文件末尾的脚本会在页面加载时同步执行完毕，宿主截图在其之后（同一套机制支撑着
+       global.html 的 ECharts 出图），因此截到的就是拆好后的两行。
+       脚本若未执行（容错路径）：不拆，整串照常显示为一行，不会出现文字粘连或错位。 */
 }
 
 .bpm {
@@ -1139,6 +1149,41 @@ body::before {
 <div class="rank3-frame-outer"></div>
 </div>
 
+<!--
+  长分区名（niconico & VOCALOID）在「&」之后换行。
+  为什么放在这里而不是 CSS 里：断点必须确定，不能由「宽度落到某个区间」推出来 —— 那个区间
+  取决于字体，字体一变断点就失效（见 .song-genre.niconicoVOCALOID 的注释）。这里直接在 DOM 上
+  把这个文本节点拆成两段、中间插一个 <br>，换行是元素级的、与字体无关。
+  脚本在页面加载时同步跑完，宿主截图在其之后；未执行时整串照常显示成一行（安全降级）。
+-->
+<script>
+(function () {
+  var el = document.querySelector('.song-genre');
+  // 只有长分区名需要拆；其余分区名（如"舞萌"）保持原样
+  if (!el || el.className.indexOf('niconicoVOCALOID') === -1) return;
+  var node = el.firstChild;
+  if (!node || node.nodeType !== 3) return;
+  var text = node.nodeValue;
+  var amp = text.indexOf('&');
+  if (amp === -1) return;
+  // 断点取「&」之后的那个空格，并把该空格一并吃掉：
+  // 第一行 "niconico &"、第二行 "VOCALOID"，两行都不带行首/行尾空白（否则行首空格会占宽，
+  // 让第二行相对第一行右移一格空格）。
+  var sp = text.indexOf(' ', amp);
+  var first, second;
+  if (sp === -1) {
+    first = text.slice(0, amp + 1);
+    second = text.slice(amp + 1);
+  } else {
+    first = text.slice(0, sp);
+    second = text.slice(sp + 1);
+  }
+  el.textContent = '';
+  el.appendChild(document.createTextNode(first));
+  el.appendChild(document.createElement('br'));
+  el.appendChild(document.createTextNode(second));
+})();
+</script>
 
 </body>
 </html>
