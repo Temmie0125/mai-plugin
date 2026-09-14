@@ -36,6 +36,36 @@ const {
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
+// ------------------------------------------------- 源码级断言用的公共工具
+
+/** lib/ 与 apps/ 下的全部 .js（含子目录，如 lib/render） */
+function walkJsFiles() {
+  const files = []
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (e.name.endsWith('.js')) files.push(p)
+    }
+  }
+  walk(path.join(PLUGIN_ROOT, 'lib'))
+  walk(path.join(PLUGIN_ROOT, 'apps'))
+  return files
+}
+
+/** 命中的**非注释**行（去掉注释行，避免命中文档里写的示例） */
+function callSites(src, re) {
+  return src.split('\n')
+    .map((line, i) => ({ line, no: i + 1 }))
+    .filter(({ line }) => {
+      const t = line.trimStart()
+      if (t.startsWith('*') || t.startsWith('//') || t.startsWith('/*')) return false
+      return re.test(line)
+    })
+}
+
+const relOf = file => path.relative(PLUGIN_ROOT, file).replace(/\\/g, '/')
+
 // ---------------------------------------------------------------- fixtures
 
 /** df 侧最小 userinfo（/query/player 形态） */
@@ -171,31 +201,11 @@ test('护栏③：写入口不接受任何选项（.length 绊线）', () => {
 })
 
 test('护栏④（源码级）：writeB50 的调用点全仓唯一，且在 handler', () => {
-  const files = []
-  const walk = (dir) => {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const p = path.join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith('.js')) files.push(p)
-    }
-  }
-  walk(path.join(PLUGIN_ROOT, 'lib'))
-  walk(path.join(PLUGIN_ROOT, 'apps'))
-
-  /** 去掉注释行后再匹配，避免命中文档注释里的示例 */
-  const callSites = (src, re) => src.split('\n')
-    .map((line, i) => ({ line, no: i + 1 }))
-    .filter(({ line }) => {
-      const t = line.trimStart()
-      if (t.startsWith('*') || t.startsWith('//') || t.startsWith('/*')) return false
-      return re.test(line)
-    })
-
   const writeHits = []
   const withCacheHits = []
-  for (const f of files) {
+  for (const f of walkJsFiles()) {
     const src = fs.readFileSync(f, 'utf8')
-    const rel = path.relative(PLUGIN_ROOT, f).replace(/\\/g, '/')
+    const rel = relOf(f)
     // scoreCache.js 自身是定义处（export function writeB50），不算调用点
     if (rel !== 'lib/scoreCache.js') {
       for (const h of callSites(src, /\.writeB50\s*\(/)) writeHits.push(`${rel}:${h.no}`)
@@ -218,6 +228,35 @@ test('护栏④（源码级）：writeB50 的调用点全仓唯一，且在 hand
     `写入口调用点应为 5 处（drawBest50 / updatePlayerCache / getMaiWhat / drawRiseScoreList / getB50ForCalc），`
     + `实际 ${withCacheHits.length} 处：${JSON.stringify(withCacheHits)}。`
     + '新增调用方前请确认它拉取的是无任何限定条件的真实 B50。')
+})
+
+test('消费方切换锁（源码级）：records 消费方一律走 cached，原语只剩 cached 内部一处', () => {
+  const plain = []
+  const cached = []
+  for (const f of walkJsFiles()) {
+    const src = fs.readFileSync(f, 'utf8')
+    const rel = relOf(f)
+    // ⚠️ `getPlayerResultCached(` 不含子串 `getPlayerResult(`，故精确串匹配即可区分
+    for (const h of callSites(src, /getPlayerResult\s*\(/)) {
+      if (h.line.includes('getPlayerResultCached(')) continue
+      if (/function\s+getPlayerResult\s*\(/.test(h.line)) continue     // 定义行
+      plain.push(`${rel}:${h.no}`)
+    }
+    for (const h of callSites(src, /getPlayerResultCached\s*\(/)) {
+      if (/function\s+getPlayerResultCached/.test(h.line)) continue    // 定义行
+      cached.push(`${rel}:${h.no}`)
+    }
+  }
+
+  // 消费方切换（设计 §5.5）的回退护栏：谁把某个表族改回实时直拉，这里立刻失败
+  assert.deepEqual(plain, [`lib/handler.js:${plain[0]?.split(':')[1]}`],
+    `getPlayerResult 原语应只剩 getPlayerResultCached 内部一处调用，实际：${JSON.stringify(plain)}`
+    + '。表族消费方一律走 getPlayerResultCached（每日本地缓存），勿改回实时直拉。')
+
+  // 计数式绊线：新增 records 消费方时回来确认它是否也该走缓存
+  assert.equal(cached.length, 8,
+    `getPlayerResultCached 调用点应为 8 处（§5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache），`
+    + `实际 ${cached.length} 处：${JSON.stringify(cached)}`)
 })
 
 // ---------------------------------------------------------------- 护栏（records）
