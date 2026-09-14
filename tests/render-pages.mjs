@@ -49,6 +49,7 @@ const { levelPlanHeights, levelScoreListLayout } = await import('../lib/tableLay
 const { getRiseScoreList } = await import('../lib/tableData.js')
 const { riseView } = await import('../lib/render/scoreViews.js')
 const { VERSION_MAP } = await import('../lib/constants.js')
+const { fitBest50 } = await import('../lib/fit.js')
 
 const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'out')
 fs.mkdirSync(outDir, { recursive: true })
@@ -186,6 +187,71 @@ function makeB50() {
 }
 
 // =====================================================================
+// fixture：拟合 B50（设计 §6；走**真实** lib/fit.js，拟合定数取自真实曲库）
+//
+// ⚠️ 必须用**独立**的确定性 RNG：主 rng 是顺序流，此处多消费一次抽样就会
+//    改变其后所有 fixture，进而让 tests/refs 的参照图比对整体失效。
+// =====================================================================
+const rngFit = mulberry32(20260914)
+const pickFit = range => Math.floor(rngFit() * range)
+const pickFitOne = arr => arr[pickFit(arr.length)]
+
+/** 取该曲拟合定数最高的谱面（无有效 fit_diff 返回 -1） */
+function bestFitChart(song) {
+  let best = -1
+  for (let i = 0; i < song.difficulties.length; i++) {
+    const fd = song.difficulties[i].stats?.fit_diff
+    if (fd > 0 && (best < 0 || fd > song.difficulties[best].stats.fit_diff)) best = i
+  }
+  return best
+}
+
+/** 生成一条成绩；level_value/rating 交给 fitBest50 覆写为拟合口径 */
+function makeFitRecord(song, li) {
+  const ds = song.difficulties[li].level_value
+  const [lo, hi] = pickFitOne(ACH_BANDS)
+  const achievements = lo + rngFit() * (hi - lo)
+  const rec = {
+    song_id: song.song_id,
+    level_index: li,
+    level_value: ds,
+    level: song.difficulties[li].level,
+    type: song.song_id < 10000 ? 'SD' : 'DX',   // 归一后口径为大写（勿沿用小写的 b50 fixture）
+    achievements,
+    dx_score: Math.round(song.difficulties[li].dx_score * (80 + rngFit() * 20.5) / 100),
+    song_name: song.song_name,
+    rate: computeRating(ds, achievements, { onlyrate: true }).toLowerCase(),
+    rating: computeRating(ds, achievements),
+  }
+  if (rngFit() < 0.45) rec.fc = pickFitOne(['fc', 'fc', 'fcp', 'ap', 'app'])
+  if (rngFit() < 0.3) rec.fs = pickFitOne(['fs', 'fsp', 'fsd', 'fsdp'])
+  return rec
+}
+
+/**
+ * 从真实曲库凑一份「有拟合定数」的成绩池，**按 isnew 分池抽样**
+ *
+ * 为什么不按 song_id 分带抽：新版本池（isnew=true）实测仅 44 首非宴曲，
+ * 若与 791 首旧版 DX 曲混在一起随机抽 120 条，抽到的新池曲期望只有 6 条左右，
+ * 渲染出的 B15 会不满 15 行 —— 那样就核验不了「B15 满行是否溢出」。
+ * 按 isnew 分池后：新池全取、旧池取足，保证 B35/B15 都是满行形态。
+ */
+function makeFitRecords() {
+  const out = []
+  for (const isNew of [false, true]) {
+    const cands = mai.totalList.root
+      .filter(s => s.song_id < 100000 && Boolean(s.isnew) === isNew)
+      .map(s => [s, bestFitChart(s)])
+      .filter(([, li]) => li >= 0)
+    for (let i = cands.length - 1; i > 0; i--) {
+      const j = pickFit(i + 1); [cands[i], cands[j]] = [cands[j], cands[i]]
+    }
+    for (const [song, li] of cands.slice(0, isNew ? 60 : 150)) out.push(makeFitRecord(song, li))
+  }
+  return out
+}
+
+// =====================================================================
 // main
 // =====================================================================
 await loadMusic()
@@ -199,6 +265,24 @@ const vB50 = b50View({
   serviceName: 'Diving-Fish', botName: 'MaiTest',
 })
 results.b50 = await shot('b50', await renderBest50(vB50))
+
+// -- 1b. 拟合b50 两态：有称号（落雪侧）／无称号（水鱼侧 dfToPlayer 不产出 trophy）--
+const factory = fitBest50(makeFitRecords(), { totalList: mai.totalList })
+const fitInfo = `候选 ${factory.candidates} 条 → B35 ${factory.best50.sd.length} + B15 ${factory.best50.dx.length}`
+console.log(`  · 拟合b50: ${fitInfo}，合计 ${factory.fitTotal}`)
+const fitPlayerBase = { ...b50f.player, rating: b50f.player.rating }
+results.fitb50 = await shot('fitb50', await renderBest50(b50View({
+  theme: 'prism_plus', qqid: null,
+  player: { ...fitPlayerBase, trophy: { id: 1, name: 'れっつゴー！', color: 'Rainbow' } },
+  best50: factory.best50, fitTotal: factory.fitTotal, fit: true,
+  serviceName: 'Lxns-Network', botName: 'MaiTest',
+})))
+results.fitb50_df = await shot('fitb50_df', await renderBest50(b50View({
+  theme: 'prism_plus', qqid: null,
+  player: fitPlayerBase,                      // 无 trophy：水鱼侧的真实形态
+  best50: factory.best50, fitTotal: factory.fitTotal, fit: true,
+  serviceName: 'Diving-Fish', botName: 'MaiTest',
+})))
 
 // -- 2. 单曲成绩卡：找一首 4 难度（无 Re:Master）的歌，含 1 行未游玩 --
 const sdSongs = songsByBand([0, 10000])

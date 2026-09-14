@@ -25,7 +25,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 指令前缀 `#` 或 `/` 均可触发；命令头默认 `mai`，可在配置中修改。发送 `#mai help` 查看完整帮助图。
 
 ```
-#mai b50 / ap50 / score <曲名> / ginfo <曲名> / rank <用户名|页码> / myrank
+#mai b50 / ap50 / 拟合b50 / score <曲名> / ginfo <曲名> / rank <用户名|页码> / myrank
 #mai song <曲名|ID> / search <关键词> / what <词>
 #   检索语法：search 定数14+ / 定数14-15 / bpm200-300（区间用 - 或 ~，尾部数字为页码）
 #mai fsline [难度色]<曲名|ID|别名> [达成率]
@@ -38,11 +38,16 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #   / alias local <ID> <别名> 本地别名 / alias sync 更新别名库
 #mai push on|off 群别名推送开关 / push global on|off 全局（仅主人）
 #mai 更新 / 强制更新 / download（资源包）/ sync（曲库）—— 均仅主人
+#mai update —— 刷新并缓存本人 B50 与全量成绩（人人可用，非管理命令）
 ```
 
 口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表` 等。
 
-> 相比原插件的行为变化：所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）；数据同步用 `#mai sync`，以避开 `update` 一词在系统更新语境下的歧义。
+> 相比原插件的行为变化：所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）。
+
+> **`update` 一词的三个归属**（曾一度全面回避该词，现按作用域划清）：`#mai 更新` 更新**插件本体**（仅主人）、`#mai sync` 同步**曲库**（仅主人）、`#mai update` 刷新**本人成绩缓存**（人人可用）。三者正则两两不交，由 `tests/manage.test.js` 与 `tests/fitRules.test.js` 双向锁定。
+
+> **成绩缓存**：`拟合b50`、`table`/`plate`/`progress`/`list`/`rise` 等全量成绩消费方共用一份**每日本地缓存**（`data/score/`）——当日首次自动拉取，之后直接读缓存；`#mai update` 可随时强制刷新。`#mai b50` / `ap50` 仍**保证实时**。曲库同步（05:30）后新上传的成绩要等次日或手动 `update` 才进完成表。`拟合b50` 用曲库里的**拟合定数**重算 Rating 并重排 B50（@他人可查对方；不支持用户名方式——缓存按查询者归属，用户名代查会串号）。
 
 > `#mai fsline`：单曲分数线成图，内含「分数线 / DX 等级 / 目标评级 / BREAK 等效数量」四张表，全部由谱面物量（各判定音符数）推出、与达成率无关；带达成率时在图外附加一行该达成率下的容错文本。难度色与曲名顺序可互换（`紫799` / `799 紫`），达成率可省略（只出图）。`#mai fsline 帮助` 查看详细用法。
 
@@ -126,7 +131,8 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 - `data/user.json`：用户绑定与主题（自 NoneBot 版 `user.db` JSON 化）；
 - `data/group.json`：群开关（猜歌 / 别名推送，**默认全关**，白名单语义——只有显式开过的群才生效）；
-- `data/music/`：曲库/别名/牌子运行时缓存（`#mai sync` 重建）。
+- `data/music/`：曲库/别名/牌子运行时缓存（`#mai sync` 重建）；
+- `data/score/`：玩家成绩缓存（`b50/<用户键>.json` 与 `records/<用户键>.json`，每日本地缓存，`#mai update` 强制刷新）。成绩可再生，故不做备份轮转；解绑**不删除**——文件带数据源戳记，切换数据源即自动判定过期重拉。
 
 曲库默认**每日 05:30 自动同步**一次。主人可随时用 `#mai sync`（别名 `更新曲库` / `数据更新`）手动同步；不需要自动同步就把配置项 `autoSync` 关掉，改为纯手动。
 

@@ -78,7 +78,9 @@ test('更新规则：强制分组捕获（决定 reset/clean 分支）', () => {
 
 test('更新规则：拒收样例', () => {
   const reg = rulesOf(MaiManage)[0].reg
-  // update 已于 8131b02 有意移出（避免与成绩数据更新混淆），勿再当作命中项
+  // update 已于 8131b02 有意移出 manage 的规则，为「成绩数据更新」腾出该词；
+  // 该词现归 apps/score.js 的 updateScore（刷新本人 B50 + 全量成绩缓存）。
+  // 此处的拒收断言仍是必须的：manage 若再吃回 update 就会抢走 score 的命令。
   for (const msg of ['#mai 强制', '#mai 更新曲绘', '#maix 更新', 'mai 更新', '#mai sync', '#phi 更新',
     '/mai update', '#mai update', '#mai download', '#mai 下载资源']) {
     assert.doesNotMatch(msg, reg, `不应命中：${msg}`)
