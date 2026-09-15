@@ -279,11 +279,131 @@ test('消费方切换锁（源码级）：records 消费方一律走 cached，�
 
   // 计数式绊线：新增 records 消费方时回来确认它是否也该走缓存
   // 12 处 = §5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache
-  //       + 随心配家族的 4 个（drawVariantBest50 / drawSong50 / drawAp50Local / drawFilteredScoreList，
-  //         见《b50扩展实现设计.md》§6/§9——全部是只读消费方，无一写盘）
+  //       + 随心配家族 3 个（drawVariantBest50 / drawSong50 / drawFilteredScoreList）
+  //       + getAp50（水鱼 AP50 与「落雪接口失败回退」**共用**这一条本地管线，故只此一处）
+  //       见《b50扩展实现设计.md》§6/§9——全部是只读消费方，无一写盘
   assert.equal(cached.length, 12,
     `getPlayerResultCached 调用点应为 12 处（§5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache`
-    + ` + 随心配的 4 个），实际 ${cached.length} 处：${JSON.stringify(cached)}`)
+    + ` + 随心配的 3 个 + getAp50），实际 ${cached.length} 处：${JSON.stringify(cached)}`)
+})
+
+// ---------------------------------------------------------------- AP50（接口优先 / 失败回退）
+
+/** 打桩曲库（AP50 的本地回退要用 isnew 分池） */
+async function withFakeLib(lib, fn) {
+  const { mai } = await import('../lib/service.js')
+  const saved = mai.totalList
+  mai.totalList = lib
+  try {
+    return await fn()
+  } finally {
+    mai.totalList = saved
+  }
+}
+
+const FAKE_LIB = {
+  byId: id => ({
+    1: { song_id: 1, isnew: false, difficulties: [] },
+    10001: { song_id: 10001, isnew: true, difficulties: [] },
+  })[id] ?? null,
+}
+
+test('AP50 落雪：接口正常 → source=lxns-api，且**不产生任何本地缓存**', async () => {
+  const stub = stubClients()
+  try {
+    tmpRoot()
+    const { getAp50 } = await import('../lib/handler.js')
+    const data = await getAp50(lxnsUser())
+    assert.equal(data.source, 'lxns-api')
+    assert.equal(stub.calls.ap50, 1, '应走 /bests/ap 接口')
+    assert.equal(stub.calls.allBest, 0, '接口成功时不该去拉全量')
+    assert.deepEqual(fs.existsSync(path.join(currentRoot, 'b50')) ? fs.readdirSync(path.join(currentRoot, 'b50')) : [], [],
+      '接口流是变体，不得写 b50 缓存（D17）')
+    assert.ok(!fs.existsSync(path.join(currentRoot, 'records')), '更不该写 records 缓存')
+  } finally {
+    stub.restore()
+  }
+})
+
+test('AP50 落雪：接口 404「score not found」= 空结果（不打回退、不告警）', async () => {
+  const stub = stubClients()
+  try {
+    tmpRoot()
+    const { getAp50, AP50_EMPTY_TEXT } = await import('../lib/handler.js')
+    // 实测语义：好友码有效但没有 AP 成绩时，落雪就是回 404 + message "score not found"
+    LxnsAPI.prototype.ap50 = async () => {
+      throw Object.assign(new Error('LXNSNotFoundError'), {
+        name: 'LXNSNotFoundError', status: 404, apiMessage: 'score not found',
+      })
+    }
+    let allBestCalls = 0
+    LxnsAPI.prototype.allBest = async () => { allBestCalls += 1; return [] }
+
+    const data = await withFakeLib(FAKE_LIB, () => getAp50(lxnsUser()))
+    assert.deepEqual(data, { empty: true }, '应直接判为空结果')
+    assert.equal(allBestCalls, 0, '空结果不该再去拉全量（白跑一趟）')
+    assert.match(AP50_EMPTY_TEXT, /还没有符合条件/)
+  } finally {
+    stub.restore()
+  }
+})
+
+test('AP50 落雪：接口真失败（非「无成绩」）→ 回退本地全量计算', async () => {
+  const stub = stubClients()
+  try {
+    tmpRoot()
+    const { getAp50 } = await import('../lib/handler.js')
+    // 模拟「接口真的不可用」：403 权限不足（= 账号未开启落雪隐私设置里的读取权限）
+    LxnsAPI.prototype.ap50 = async () => {
+      throw Object.assign(new Error('LXNSPermissionDeniedError'), {
+        name: 'LXNSPermissionDeniedError',
+        status: 403,
+        apiMessage: 'permission denied',
+        url: 'https://maimai.lxns.net/api/v0/maimai/player/0/bests/ap',
+      })
+    }
+    // 回退数据源：本人 OAuth 全量成绩（含 AP 成绩）。
+    // ⚠️ 自己计数，别用 stub.calls.allBest —— 覆盖掉桩函数后那个计数器就失效了
+    let allBestCalls = 0
+    LxnsAPI.prototype.allBest = async () => {
+      allBestCalls += 1
+      return [
+        // 新 API 约定：DX 与标准同 ID（<10000），由 lxnsFormatResult 还原成仓内的 +10000
+        { id: 1, type: 'standard', song_name: 'S1', level: '13', level_index: 3, achievements: 100.5, fc: 'ap', fs: '', dx_score: 1000 },
+        { id: 1, type: 'dx', song_name: 'S2', level: '13', level_index: 3, achievements: 100.6, fc: 'app', fs: '', dx_score: 900 },
+        { id: 2, type: 'standard', song_name: 'S3', level: '13', level_index: 3, achievements: 99.0, fc: 'fc', fs: '', dx_score: 800 },
+      ]
+    }
+
+    const data = await withFakeLib(FAKE_LIB, () => getAp50(lxnsUser()))
+    assert.equal(data.source, 'local', '接口失败应回退本地计算')
+    assert.equal(allBestCalls, 1, '回退应拉一次全量成绩')
+    // 只有 ap/app 两条入选（fc 那条被过滤），并按 isnew 分池
+    assert.deepEqual(data.best50.sd.map(x => x.song_id), [1])
+    assert.deepEqual(data.best50.dx.map(x => x.song_id), [10001])
+    assert.deepEqual(b50Files(), [], '回退路径同样不得写 b50 缓存')
+  } finally {
+    stub.restore()
+  }
+})
+
+test('AP50 水鱼：不走接口，直接本地全量计算', async () => {
+  const stub = stubClients()
+  try {
+    tmpRoot()
+    const { getAp50 } = await import('../lib/handler.js')
+    DivingFishAPI.prototype.queryUserRecords = async () => [
+      { id: 1, title: 'S1', level: '13', level_index: 3, type: 'SD', ds: 13, ra: 300, achievements: 100.5, fc: 'ap', fs: '', rate: 'sssp', dxScore: 1000 },
+      { id: 2, title: 'S2', level: '13', level_index: 3, type: 'SD', ds: 13, ra: 290, achievements: 100.0, fc: 'fcp', fs: '', rate: 'sss', dxScore: 900 },
+    ]
+    const data = await withFakeLib(FAKE_LIB, () => getAp50(dfUser()))
+    assert.equal(data.source, 'local')
+    assert.equal(stub.calls.ap50, 0, '水鱼不该去请求落雪接口')
+    assert.deepEqual(data.best50.sd.map(x => x.song_id), [1], '只收 ap/app')
+    assert.deepEqual(b50Files(), [])
+  } finally {
+    stub.restore()
+  }
 })
 
 // ---------------------------------------------------------------- 护栏（records）

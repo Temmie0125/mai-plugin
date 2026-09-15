@@ -36,7 +36,9 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai table <定数> / plate <条件或版本称号> / plateinfo / progress / list
 #   list 除定数外还支持关键词：list 理论(AP+) / list 新歌 / list 旧版本（纯成绩列表，按 Rating 降序）
 #   plate 的称号位支持「大将」：`#mai 堇大将完成表` = 评级 ≥ SSS+ 的完成表（不含「真」——无将牌图）
-#mai bind lxns|df|qq / unbind <lxns|df|qq> / source / theme
+#mai bind lxns|df|qq / bind fc [好友码] / unbind <lxns|df|qq> / source / theme
+#   bind fc：只绑好友码（免 OAuth）——可查 B50 / AP50 / 单曲；不带参数时按 QQ 自动解析；绑定即切到落雪
+#   拟合b50、随心配、完成表等**全量成绩**功能需要「bind lxns」授权（开发者接口只给不含达成率的简化成绩）
 #mai guess / guessill / letter（开字母）/ fortune（今日舞萌）/ rand / rise
 #   游戏进行中：开 <一个字符> 翻开所有该字符 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
 #mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票
@@ -51,6 +53,10 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 > 相比原插件的行为变化：所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）。
 
 > **`update` 一词的三个归属**（曾一度全面回避该词，现按作用域划清）：`#mai 更新` 更新**插件本体**（仅主人）、`#mai sync` 同步**曲库**（仅主人）、`#mai update` 刷新**本人成绩缓存**（人人可用）。三者正则两两不交，由 `tests/manage.test.js` 与 `tests/fitRules.test.js` 双向锁定。
+
+> **落雪数据源的两种绑定**：`bind lxns`（OAuth 授权，全功能）与 `bind fc [好友码]`（免授权轻量绑定：B50 / AP50 / 单曲）。好友码绑定走落雪**开发者接口**，要求该账号在落雪「账号设置 → 隐私设置」里开启**允许读取玩家信息 / 谱面成绩 / 历史成绩**三项 —— 缺任一项会返回 `404/400`，此时 B50、AP50 都会报错。全量成绩（拟合b50、随心配、完成表、理论列表）开发者接口给不了（只返回不含达成率的简化成绩），必须用 `bind lxns` 授权。
+>
+> **AP50 的空结果**：若账号**从未 AP 过任何曲目**，落雪接口返回的是 `404 score not found`（不是空数组），插件据此回「还没有符合条件的成绩（AP / AP+）」。若接口因权限/网络失败，会自动**回退到本地全量成绩计算**（需要 OAuth 授权），并打一条含状态码与 URL 的 warn 便于排查。
 
 > **成绩缓存**：`拟合b50`、`随心配b50`、`table`/`plate`/`progress`/`list`/`rise` 等全量成绩消费方共用一份**每日本地缓存**（`data/score/`）——当日首次自动拉取，之后直接读缓存；`#mai update` 可随时强制刷新。`#mai b50` 仍**保证实时**；`ap50` 落雪侧走接口实时、**水鱼侧由本地全量成绩算出**（水鱼没有 AP50 接口），故水鱼的 AP50 同样受每日缓存时效约束。曲库同步（05:30）后新上传的成绩要等次日或手动 `update` 才进完成表/随心配。`拟合b50` 用曲库里的**拟合定数**重算 Rating 并重排 B50（@他人可查对方；不支持用户名方式——缓存按查询者归属，用户名代查会串号）。
 >

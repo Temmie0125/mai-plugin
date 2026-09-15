@@ -147,7 +147,7 @@ test('getPlayerResult：落雪 → GET /scores，映射为 PlayedResult[]', asyn
     body: {
       code: 0,
       data: [{
-        id: 11451, song_name: 'テスト', level: '13', level_index: 3,
+        id: 1451, song_name: 'テスト', level: '13', level_index: 3,
         type: 'dx', achievements: 100.5, dx_score: 2000, dx_rating: 300, fc: 'ap', fs: 'fsd', rate: 'sss',
       }],
     },
@@ -158,6 +158,17 @@ test('getPlayerResult：落雪 → GET /scores，映射为 PlayedResult[]', asyn
   assert.ok(call, '应打到落雪 /scores')
   assert.equal(call.headers.Authorization, 'Bearer AT')
   assert.equal(out.length, 1)
-  assert.equal(out[0].song_id, 11451 + 10000, 'DX 谱 song_id 应 +10000')
+  // 新 API 文档：「标准/DX 曲目 ID 一致，不存在大于 10000 的曲目 ID」
+  // ⇒ DX 的 id 是 <10000，须 +10000 还原成仓内的 DX song_id
+  assert.equal(out[0].song_id, 1451 + 10000, 'DX 谱 song_id 应 +10000 还原')
   assert.equal(out[0].rating, 300)
+})
+
+test('lxnsFormatResult：已带 10000 偏移的 id 不再二次偏移（旧快照/旧缓存的兼容）', async () => {
+  const { lxnsFormatResult } = await import('../lib/merge/playResult.js')
+  assert.equal(lxnsFormatResult({ id: 1451, type: 'dx', achievements: 100 }).song_id, 11451)
+  assert.equal(lxnsFormatResult({ id: 11451, type: 'dx', achievements: 100 }).song_id, 11451,
+    '已是 10001+ 的 id 视为已还原，保持原值')
+  assert.equal(lxnsFormatResult({ id: 1451, type: 'standard', achievements: 100 }).song_id, 1451,
+    '标准谱不加偏移')
 })

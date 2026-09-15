@@ -67,15 +67,24 @@ test('歌50 / 全Xb50：参数捕获', () => {
   assert.doesNotMatch('#mai 全13b5', all)
 })
 
-test('变体白名单：命中常见形态，拒收非 token', () => {
+test('变体白名单：命中常见形态 + **捕获组必须存在**（漏了就是「认领但永不回复」）', () => {
   const reg = regOf(MaiScore, 'variant50')
-  for (const msg of ['#mai FC50', '#mai fc50', '#mai FC+50', '#mai 单刷50', '#mai 拼机50',
+  const cases = ['#mai FC50', '#mai fc50', '#mai FC+50', '#mai 单刷50', '#mai 拼机50',
     '#mai SP50', '#mai FS50', '#mai FDX50', '#mai FSD50', '#mai nb50', '#mai 牛逼50',
     '#mai 越级50', '#mai 丢人50', '#mai 寸50', '#mai 锁50', '#mai 鸟+寸50', '#mai 仅SS50',
     '#mai 东方50', '#mai 车万50', '#mai v家50', '#mai 辉50', '#mai 白代50', '#mai 真超檄50',
-    '#mai DX50', '#mai 标准50', '#mai 红谱50', '#mai 紫50']) {
+    '#mai DX50', '#mai 标准50', '#mai 红谱50', '#mai 紫50']
+  for (const msg of cases) {
     assert.match(msg, reg, `应命中：${msg}`)
+    // ⚠️ 2026-09-15 真机事故的锁：规则写成非捕获组 `(?:…)` 时下面这条会失败
+    // （fnc 取不到 token ⇒ raw 恒为 '' ⇒ 解析失败 ⇒ return false 放行 ⇒ 无回复且日志无完成行）
+    assert.equal(typeof msg.match(reg)?.[1], 'string', `必须捕获 token：${msg}`)
+    assert.ok(msg.match(reg)[1].length > 0, `捕获不能为空：${msg}`)
   }
+  // 捕获的就是 token 本身（含加号、别名、中文）
+  assert.equal('#mai 鸟+寸50'.match(reg)[1], '鸟+寸')
+  assert.equal('#mai 仅sss+50'.match(reg)[1], '仅sss+')
+  assert.equal('#mai 真超檄50'.match(reg)[1], '真超檄')
   for (const msg of ['#mai 13b50', '#mai 全13b5', '#mai 紫的50', '#mai 东方之珠50x',
     '#mai 全13b50']) {   // 全Xb50 归 all50 规则，不属于本白名单
     assert.doesNotMatch(msg, reg, `不应命中：${msg}`)

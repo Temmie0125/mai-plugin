@@ -59,7 +59,10 @@ const REG_UPDATE = () => new RegExp(`^[#/]${H()}\\s*[uU]pdate\\s*$`)
 const REG_VARIANT_HELP = () => new RegExp(`^[#/]${H()}\\s*随心配(?:[bB]50)?(?:\\s*(?:[hH]elp|帮助))?\\s*$`)
 const REG_SONG50 = () => new RegExp(`^[#/]${H()}\\s*歌50(?:\\s+(.+))?\\s*$`)
 const REG_ALL50 = () => new RegExp(`^[#/]${H()}\\s*全(.+?)b50\\s*$`)
-const REG_VARIANT50 = () => new RegExp(`^[#/]${H()}\\s*(?:${variantTokenPattern()})50\\s*$`)
+// ⚠️ 这里必须是**捕获组** `(…)`，不能写成非捕获组 `(?:…)`：
+// fnc 要用 m[1] 取回 token，写错则 raw 恒为 ''、解析失败、return false 放行 ——
+// 表现为「命令被认领但永远没有回复、日志里连完成行都没有」（2026-09-15 真机踩过）
+const REG_VARIANT50 = () => new RegExp(`^[#/]${H()}\\s*(${variantTokenPattern()})50\\s*$`)
 /**
  * 谱师兜底规则：谱师名含空格（`Moon Strix`）与 `@`/`-`，塞不进单 token 白名单，故单独一条。
  * ⚠️ **未命中一律 `return false` 放行**（宿主 loader.js:303 `if (res === false) continue`）——

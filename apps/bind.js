@@ -12,7 +12,7 @@ import plugin from '../../../lib/plugins/plugin.js'
 import Config, { head } from '../lib/config.js'
 import * as database from '../lib/database.js'
 import { getUserAndAuth, effectiveService } from '../lib/user.js'
-import { bindLxns, bindDivingfish, DF_QQ_HINT } from '../lib/handler.js'
+import { bindLxns, bindDivingfish, bindFriendCode, DF_QQ_HINT } from '../lib/handler.js'
 import { botName } from '../lib/render/picmodle.js'
 import {
   buildAuthorizeUrl, extractAuthorizationCode, isBindingChannelAllowed,
@@ -29,6 +29,8 @@ const H = () => head()
 const REG_BIND_LXNS = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`)
 const REG_BIND_DF = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`)
 const REG_BIND_QQ = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`)
+/** 好友码绑定：`#mai bind fc [好友码]` / `#mai bind 好友码 [好友码]`（不带参数时按 QQ 自动解析） */
+const REG_BIND_FC = () => new RegExp(`^[#/]${H()}\\s*(?:bind\\s+(?:fc|FC|好友码)|绑定(?:fc|FC|好友码))(?:\\s+(\\d+))?\\s*$`)
 const REG_BIND = () => new RegExp(`^[#/]${H()}\\s*(?:bind|绑定)\\s*$`)
 const REG_UNBIND = () => new RegExp(`^[#/]${H()}\\s*(?:unbind|解绑)(?:\\s+(\\S+))?$`)
 const REG_SOURCE = () => new RegExp(`^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`)
@@ -90,6 +92,7 @@ const LXNS_ERROR = 'BOT管理员尚未配置落雪查分器相关信息'
 const BIND_GUIDE = [
   '请指定要绑定的类型：',
   `・#${H()} bind lxns —— 绑定落雪查分器（授权后可查询/切换到落雪数据源）`,
+  `・#${H()} bind fc [好友码] —— 只绑好友码（免授权；可查 B50 / AP50 / 单曲，不带参数时按 QQ 解析）`,
   `・#${H()} bind df —— 绑定水鱼查分器（授权后 BOT 可代查您的水鱼成绩）`,
   `・#${H()} bind qq <QQ号> —— 官方QQBot 环境补充游戏 QQ（解锁水鱼查询）`,
   `・#${H()} unbind <lxns|df|qq> 解除绑定 · #${H()} source 切换数据源`,
@@ -115,6 +118,30 @@ const BINDING_TEMPORARY_FAILED_MSG = [
   `如果授权码已经使用，请再次发送「${LXNS_BIND_CMD()}」重新授权。`,
 ].join('\n')
 const LXNS_TIMEOUT_MSG = () => `授权绑定已超时，请重新发送「${LXNS_BIND_CMD()}」获取授权链接`
+
+/** 好友码绑定失败的两档文案（与落雪绑定同款思路：先指路，再兜底） */
+const BIND_FC_FAILED_MSG = () => [
+  '好友码绑定失败：落雪按 QQ 没有返回可用的好友码。',
+  '常见原因：① 未在落雪绑定过 QQ；② 未开启落雪「账号设置 → 隐私设置」的三项读取权限；',
+  '③ BOT 的落雪开发者 Token 未配置。',
+  `※ 可直接用「#${H()} bind fc <好友码>」手动填写好友码。`,
+].join('\n')
+const BIND_FC_BUSY_MSG = () => `好友码绑定暂时失败：落雪接口暂时不可用，请稍后再试，或用「#${H()} bind fc <好友码>」手动填写。`
+
+/**
+ * 好友码绑定异常 → 文案（与 classifyBindError 同款显式 instanceof 名单）
+ * - NotFound / PermissionDenied：落雪明确回「没有这个资源/权限」→ 指路隐私设置与手输
+ * - 其余（OAuth 令牌、限流、网络、未知）：暂时性 → 建议稍后重试
+ */
+export function classifyBindFcError(error) {
+  if (error instanceof LXNSNotFoundError
+    || error instanceof LXNSPermissionDeniedError
+    || error instanceof LXNSTokenError) {
+    return BIND_FC_FAILED_MSG()
+  }
+  logger.warn?.(`[mai-plugin] 好友码绑定失败：${error?.name || ''} ${error?.message || error}`)
+  return BIND_FC_BUSY_MSG()
+}
 
 const DIVINGFISH_OAUTH_ERROR = 'BOT管理员尚未配置水鱼查分器 OAuth 应用，无法进行绑定授权。'
 const DIVINGFISH_BIND_FAILED_MSG = '发起水鱼授权失败：水鱼账号服务可能暂时不可用，请稍后再试。'
@@ -169,6 +196,8 @@ export class MaiBind extends plugin {
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:lxns|lx|落雪)|lxbind|绑定落雪|绑定lx)(?:\\s+(.+))?$`, fnc: 'bindLxnsCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:df|水鱼)|dfbind|绑定水鱼|绑定df)(?:\\s+(.+))?$`, fnc: 'bindDfCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind\\s+(?:qq|QQ)|绑定(?:qq|QQ))(?:\\s+(\\S+))?$`, fnc: 'bindQqCmd' },
+        // 好友码绑定：规则串取 REG_BIND_FC().source，与 fnc 内解析共用同一份（防漂移）
+        { reg: REG_BIND_FC().source, fnc: 'bindFcCmd' },
         { reg: `^[#/]${H()}\\s*(?:bind|绑定)\\s*$`, fnc: 'bindGuide' },
         { reg: `^[#/]${H()}\\s*(?:unbind|解绑)(?:\\s+(\\S+))?$`, fnc: 'unbindCmd' },
         { reg: `^[#/]${H()}\\s*(?:source|数据源)(?:\\s+(\\S+))?$`, fnc: 'switchSource' },
@@ -262,6 +291,27 @@ export class MaiBind extends plugin {
       `※ 官方QQBot 环境无法自读 QQ 号，水鱼查分器现在起可用：发送「#${H()} bind df」完成授权后即可查分。`,
       true,
     )
+    return true
+  }
+
+  /**
+   * `#mai bind fc [好友码]`：按好友码绑定落雪（免 OAuth 的轻量绑定）
+   *
+   * 与 `bind lxns` 的分工见 lib/handler.js:bindFriendCode —— 好友码足以查
+   * B50 / AP50 / 单曲（走落雪开发者接口，要求账号开启三项隐私设置），
+   * 全量成绩系仍需 OAuth。不带参数时按 QQ 自动解析好友码。
+   *
+   * 绑定类命令**不包 handleErrors**（本文件既有约定）：异常按绑定场景分类文案。
+   */
+  async bindFcCmd(e) {
+    const arg = ((e.msg || '').match(REG_BIND_FC()) || [])[1] || null
+    const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
+    if (!got) return true
+    try {
+      await this.reply(await bindFriendCode(got.user, arg), true)
+    } catch (error) {
+      await this.reply(classifyBindFcError(error), true)
+    }
     return true
   }
 
