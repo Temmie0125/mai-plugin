@@ -100,6 +100,40 @@ test('非 fit 模式：有真实称号时展示称号名（fit 模式则被替�
   assert.ok(textsOf(fitted).includes('拟合 B35: 300 + B15: 200 = 500'))
 })
 
+test('变体模式：称号位换成条件合计（右端为 x+y，不是真实 rating），变体名走横幅行', () => {
+  const view = b50View({
+    player: PLAYER, best50: BEST50, serviceName: 'Diving-Fish', botName: 'MaiTest',
+    variantLabel: 'FC',
+  })
+  const texts = textsOf(view)
+  assert.ok(texts.includes('B35: 300 + B15: 200 = 500'),
+    `称号位应为条件合计，实际：${JSON.stringify(texts)}`)
+  assert.ok(!findText(view, `= ${PLAYER.rating}`),
+    '右端不得再写玩家真实 Rating（与左侧条件合计不同源，见设计 V9）')
+  // 变体名在横幅行（y=213），不在称号框内
+  const banner = view.texts.find(t => t.text === 'FC')
+  assert.ok(banner, '应出现变体名横幅')
+  assert.equal(banner.y, 213, '横幅画在称号框下方留白处')
+  assert.equal(banner.x, 700)
+  // 真实称号即使存在也被替换（与 fit 模式同款语义）
+  const withTrophy = { ...PLAYER, trophy: { id: 1, name: 'れっつゴー！', color: 'Rainbow' } }
+  const fitted = b50View({
+    player: withTrophy, best50: BEST50, serviceName: 'df', botName: 'b', variantLabel: '其他游戏',
+  })
+  assert.ok(!textsOf(fitted).includes('れっつゴー！'), '变体模式不展示真实称号')
+  assert.ok(textsOf(fitted).includes('其他游戏'), '长变体名（4 字）原样进横幅，不截断')
+})
+
+test('变体模式：定数行仍是真实口径（不走 fit 的拟合定数分支）', () => {
+  withTotalLevelValueMap({ '1-3': 13, '10001-3': 12.5 }, () => {
+    const view = b50View({
+      player: PLAYER, best50: BEST50, serviceName: 'df', botName: 'b', variantLabel: '东方',
+    })
+    assert.ok(findText(view, '13.0 -> 92'), '定数行读当前曲库（pyFloat 口径）')
+    assert.ok(findText(view, '12.5 -> 281'))
+  })
+})
+
 test('两模式共同项不变：头部 rating 数字图、页脚数据源、成绩条数', () => {
   withTotalLevelValueMap({ '1-3': 13, '10001-3': 12.5 }, () => {
     const opts = { player: PLAYER, best50: BEST50, serviceName: 'Diving-Fish', botName: 'MaiTest' }

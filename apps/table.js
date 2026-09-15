@@ -20,19 +20,21 @@ import { staticRoot } from '../lib/path.js'
 import { head } from '../lib/config.js'
 import { ensureReady } from '../lib/service.js'
 import {
-  drawLevelProgress, drawLevelScoreList, drawPlateProgress, drawPlateTable,
+  drawFilteredScoreList, drawLevelProgress, drawLevelScoreList, drawPlateProgress, drawPlateTable,
   drawRatingTable, drawRatingTableText,
 } from '../lib/handler.js'
 import { toSegment, botName } from '../lib/render/picmodle.js'
 import { getUserAndAuth } from '../lib/user.js'
-import { COMBO_PLUS, LEVEL_LIST, PLATE_CN, RANK_PLUS, SYNC_PLUS } from '../lib/constants.js'
+import { listKeyPattern, listPresetOf } from '../lib/variantSpec.js'
+import {
+  COMBO_PLUS, LEVEL_LIST, PLATE_CN, PLAN_CHARS, RANK_PLUS, SYNC_PLUS, VERSION_CHARS,
+} from '../lib/constants.js'
 
 const H = () => head()
 
-/** 版本字（源 TABLE_PATTERN 首字集合，含 PLATE_CN 简繁对） */
-export const VERSION_CHARS = '真超檄橙暁晓桃櫻樱紫菫堇白雪輝辉舞霸熊華华爽煌星宙祭祝双宴镜彩'
-/** 称号字（源 `[極极将舞神者]`，舞 单列以区分「舞舞」） */
-export const PLAN_CHARS = '極极将神者'
+// 版本字/称号字已上移到 lib/constants.js（随心配变体解析层也要用同一份，见 b50扩展实现设计 §2.3）
+// 此处转出以保持既有导出面（曾定义在本文件，外部可能仍在 import）
+export { VERSION_CHARS, PLAN_CHARS }
 
 const REG_TABLE = () => new RegExp(`^[#/]${H()}\\s*(?:table|定数表)\\s+(\\d+\\+?)\\s*$`)
 const REG_RATING_PLATE = () => new RegExp(`^[#/]${H()}\\s*plate\\s+(\\d+\\+?)(?:\\s+(\\S+))?\\s*$`)
@@ -60,6 +62,21 @@ const REG_LIST = () => new RegExp(
   `^[#/]${H()}\\s*(?:list|分数列表)(?:\\s+([0-9]+(?:\\.[0-9]+)?\\+?))?(?:\\s+(\\d+))?\\s*$`
 )
 
+/**
+ * 分数列表：**关键词**形态（理论 / 新歌 / 旧版本，设计 §8.2）
+ *
+ * 既有 `REG_LIST` 只吃数字，`list 理论` 过去**整体不命中**（无任何回复），故单开两条规则。
+ * 数字 vs 关键词天然互斥，无需负向前瞻；关键词表与 apps/score.js 的时间类迁移引导**共用**
+ * lib/variantSpec.js 的 LIST_KEY_ALIAS（改一处两边同步）。
+ */
+const REG_LIST_KEY = () => new RegExp(
+  `^[#/]${H()}\\s*(?:list|分数列表)\\s+(${listKeyPattern()})\\s*(\\d+)?\\s*$`
+)
+/** 免 `list` 子命令的口语形：`#mai 理论分数列表` / `#mai 新歌列表` */
+const REG_LIST_KEY_SAY = () => new RegExp(
+  `^[#/]${H()}\\s*(${listKeyPattern()})(?:分数列表|列表)\\s*(\\d+)?\\s*$`
+)
+
 /** 源 CATEGORY_ALIAS（mai_table.py:34）：中文类别词 → 内部类别 */
 export const CATEGORY_ALIAS = {
   已完成: 'completed', 未完成: 'unfinished', 未开始: 'notplayed', 未游玩: 'notplayed',
@@ -77,24 +94,27 @@ export const CATEGORY_ALIAS = {
  *  2. 源由「命中哪个 matcher」区分完成表/进度，此处由参数词区分（k3）。
  */
 const REG_VERSION_PLATE = () => new RegExp(
-  `^[#/]${H()}\\s*plate\\s+([${VERSION_CHARS}])(舞舞|[${PLAN_CHARS}])(?:舞)?`
+  `^[#/]${H()}\\s*plate\\s+([${VERSION_CHARS}])(舞舞|大将|[${PLAN_CHARS}])(?:舞)?`
   + `(?:\\s*(完成表?|进度))?\\s*(\\d+)?\\s*$`
 )
 
 /** 口语形态「完成表/进度」为必需（源 TABLE_PATTERN 二者必居其一），故不加可选 */
 const REG_VERSION_PLATE_SAY = () => new RegExp(
-  `^([${VERSION_CHARS}])(舞舞|[${PLAN_CHARS}])(?:舞)?\\s*(完成表?|进度)(\\d+)?$`
+  `^([${VERSION_CHARS}])(舞舞|大将|[${PLAN_CHARS}])(?:舞)?\\s*(完成表?|进度)(\\d+)?$`
 )
 
 /**
  * 版本称号完成表参数归一（`#mai plate` 子命令与口语「真极完成表」共用，防两条路径漂移）
  * 源 mai_table.py:122 顺序：PLATE_CN 简繁归一 → 真将守卫
+ * 「大将」（评级 ≥ SSS+ 的完成表，b50扩展设计 V6）与 極/极/将/神/者/舞舞 同处这一参数位。
  * @returns {{ver:string, plan:string, page:number, isProgress:boolean}|{error:string}}
  */
 export function parseVersionPlate(ver, plan, kindRaw, pageRaw) {
   let v = ver
   if (PLATE_CN[v]) v = PLATE_CN[v]
-  if (`${v}${plan}` === '真将') return { error: '真系没有真将哦。' }
+  // 「真」没有将牌图（资源包 plate_version 下真只有 極/神/舞舞），大将复用将图（V19）故一并拦下——
+  // 放进去只会在 plateTableView 的缺图守卫上抛错，用户拿到的是笼统的「未知错误」
+  if (`${v}${plan}` === '真将' || `${v}${plan}` === '真大将') return { error: '真系没有真将哦。' }
   const page = parseInt(pageRaw || '1', 10)
   // 源由「命中哪个 matcher」区分完成表/进度；收编为子命令后由参数词区分，缺省为完成表
   const isProgress = (kindRaw || '').startsWith('进度')
@@ -120,6 +140,9 @@ export class MaiTable extends plugin {
         { reg: REG_VERSION_PLATE().source, fnc: 'versionPlate' },
         { reg: REG_PROGRESS().source, fnc: 'levelProgress' },
         { reg: REG_LIST().source, fnc: 'levelScoreList' },
+        // 关键词形态的列表（理论/新歌/旧版本）：两条规则共用一个执行体
+        { reg: REG_LIST_KEY().source, fnc: 'levelScoreListKey' },
+        { reg: REG_LIST_KEY_SAY().source, fnc: 'levelScoreListKey' },
       ],
     })
   }
@@ -261,6 +284,31 @@ export class MaiTable extends plugin {
     const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
     if (!got) return true
     const payload = await drawLevelScoreList(got.user, rating, page)
+    await this.reply(toSegment(payload), true)
+    return true
+  }
+
+  /**
+   * 关键词形态的分数列表（b50扩展设计 §8.2 / V20 / V26 / V28）
+   *
+   * `#mai list 理论` / `#mai 理论分数列表` / `#mai list 新歌` / `#mai 旧版本列表`…
+   * 数字形态仍归 `levelScoreList`（两条规则互斥）。排序与过滤在 handler 的列表预设里 ——
+   * 按 **Rating 降序**（刻意偏离 `processLevelScoreList` 的达成率降序，见 PESET 注释）。
+   */
+  async levelScoreListKey(e) {
+    if (!(await ensureReady(e))) return true
+    const m = (e.msg || '').match(REG_LIST_KEY()) || (e.msg || '').match(REG_LIST_KEY_SAY())
+    if (!m) return false                       // 防御性放行（规则已限定形状，理论不可达）
+    const preset = listPresetOf(m[1])
+    if (!preset) {
+      await this.reply('无法识别的列表类型。', true)
+      return true
+    }
+    const page = parseInt(m[2] || '1', 10)
+
+    const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
+    if (!got) return true
+    const payload = await drawFilteredScoreList(got.user, preset, Number.isFinite(page) && page > 0 ? page : 1)
     await this.reply(toSegment(payload), true)
     return true
   }

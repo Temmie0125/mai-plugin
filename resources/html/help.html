@@ -127,7 +127,7 @@
 <body>
 <div id="container">
   <div class="header">
-    <h1>舞萌DX 帮助</h1>
+    <h1>{{helpTitle}}</h1>
     <div class="ver">{{version}} · 前缀 # 或 / 均可触发 · 以下示例均以 #{{cmdHead}} 为例</div>
   </div>
 
@@ -148,7 +148,7 @@
         {{/each}}
       </div>
       {{/each}}
-      {{if ci === 2}}
+      {{if ci === 2 && !hideSideCard}}
       <div class="card sidecard">
         <div class="group">参数说明</div>
         <div class="kv"><b>&lt;&gt;</b><span>必带参数</span></div>
@@ -189,7 +189,7 @@
   </div>
 
   <div class="footer">
-    <span>{{version}} · 发送 #{{cmdHead}} 帮助 随时查看本图</span>
+    <span>{{footerHint}}</span>
     <span>Powered by mai-plugin</span>
   </div>
 </div>

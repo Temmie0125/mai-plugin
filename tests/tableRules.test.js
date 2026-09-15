@@ -95,9 +95,12 @@ test('定数表守卫：无参数给出引导', async () => {
   assert.match(replies[0], /请输入定数/)
 })
 
-test('规则表顺序：plateinfo → 定数表 → 定数完成表 → 版本完成表 → 等级进度 → 分数列表', () => {
+test('规则表顺序：plateinfo → 定数表 → 定数完成表 → 版本完成表 → 等级进度 → 分数列表 → 关键词列表', () => {
+  // ⚠️ 声明序即匹配序（宿主首中先服务）。末尾两条是「理论/新歌/旧版本」的关键词形态
+  //    （数字形态仍归 levelScoreList，两者互斥；见《b50扩展实现设计.md》§8.2）
   assert.deepEqual(rules.map(r => r.fnc),
-    ['plateInfo', 'ratingTable', 'ratingPlate', 'versionPlate', 'levelProgress', 'levelScoreList'])
+    ['plateInfo', 'ratingTable', 'ratingPlate', 'versionPlate', 'levelProgress', 'levelScoreList',
+      'levelScoreListKey', 'levelScoreListKey'])
 })
 
 // =====================================================================
