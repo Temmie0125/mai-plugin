@@ -158,6 +158,23 @@ test('V1 锁：歌50 重复填充 B35+B15，合计 = 50 × 该谱 Rating', () =>
   assert.equal(dup.best50.sd[0].rating, 400)
 })
 
+test('歌50 模拟模式：预置成绩直接填池，**完全不看传入的 records**', () => {
+  const lib = mkLib([{ song_id: 799 }])
+  const sim = rec(799, { rating: 407, achievements: 101, rate: 'sssp', fc: 'app', fs: 'fdxp', dx_score: 2100 })
+
+  // 传空 records 也必须出图（旧路径会因 candidates 0 回「未找到该曲目的成绩」）
+  const { best50, total, candidates } = variantBest50(
+    [], repeatSpec({ song_id: 799, level_index: 3 }, '歌50 · 白潘 · 模拟 …', sim), { totalList: lib })
+  assert.equal(candidates, 1)
+  assert.equal(total, 407 * 50)
+  assert.ok(best50.sd.every(x => x === sim || (x.rating === 407 && x.fc === 'app' && x.fs === 'fdxp' && x.dx_score === 2100)))
+
+  // 有真实成绩在场也不会被选中（模拟成绩优先）
+  const other = variantBest50([rec(799, { rating: 100 })],
+    repeatSpec({ song_id: 799, level_index: 3 }, '歌50 · 白潘 · 模拟 …', sim), { totalList: lib })
+  assert.equal(other.total, 407 * 50)
+})
+
 // ---------------------------------------------------------------- 变体接线
 
 test('变体接线：FC/拼机/分类/版本 各挑出正确候选', () => {

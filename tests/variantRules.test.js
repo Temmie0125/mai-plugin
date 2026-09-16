@@ -59,12 +59,45 @@ test('歌50 / 全Xb50：参数捕获', () => {
   assert.equal('#mai 歌50'.match(s50)?.[1], undefined, '无参不捕获（fnc 回用法提示）')
   assert.doesNotMatch('#mai 歌500', s50)
 
+  // 模拟参数（达成率/评级/同步/DX/标志）走同一条规则的捕获组，顺序任意
+  for (const raw of ['白潘 理论 FDX+ 5星 AP+', '799 紫 SS+', '白潘 99.00 FDX dx1145 AP', '紫 799 SS+']) {
+    assert.equal(`#mai 歌50 ${raw}`.match(s50)?.[1], raw)
+  }
+
   const all = regOf(MaiScore, 'all50')
   assert.equal('#mai 全13b50'.match(all)?.[1], '13')
   assert.equal('#mai 全红b50'.match(all)?.[1], '红')
   assert.equal('#mai 全13.5b50'.match(all)?.[1], '13.5')
   assert.doesNotMatch('#mai 全13', all)
   assert.doesNotMatch('#mai 全13b5', all)
+})
+
+test('歌50 模拟：捕获组 → splitSimTokens → parseSong50Args 的接力（两段各管一段）', async () => {
+  const { splitSimTokens } = await import('../lib/simScore.js')
+  const { parseSong50Args } = await import('../apps/score.js')
+  const s50 = regOf(MaiScore, 'song50')
+
+  const cases = [
+    // 输入、期望的 [难度色, 曲名]、断言模拟侧
+    // 曲名刻意避开「首字是难度色」的名字（如 白潘）：那类会命中**既有**的粘连语义
+    // （白潘 → 白谱 + 潘），由 apps/score.js 的回退分支处理，不属本接力用例
+    ['#mai 歌50 茄子 理论 FDX+ 5星 AP+', [null, '茄子'], s => {
+      assert.equal(s.sim.ach, 101)
+      assert.equal(s.sim.fc, 'app')
+    }],
+    ['#mai 歌50 799 紫 SS+', ['紫', '799'], s => assert.equal(s.sim.ach, 99.5)],
+    ['#mai 歌50 茄子 99.00 FDX dx1145 AP', [null, '茄子'], s => assert.equal(s.sim.ach, 99)],
+    // 非模拟：一字不差地退回原有解析（含粘连与「色在前、id 在后」两条既有写法）
+    ['#mai 歌50 紫茄子', ['紫', '茄子'], s => assert.equal(s.sim, null)],
+    ['#mai 歌50 紫 799', ['紫', '799'], s => assert.equal(s.sim, null)],
+    ['#mai 歌50 QZKago Requiem', [null, 'QZKago Requiem'], s => assert.equal(s.sim, null)],
+  ]
+  for (const [msg, [color, q], check] of cases) {
+    const split = splitSimTokens(msg.match(s50)[1])
+    assert.equal(split.error, null, msg)
+    assert.deepEqual(parseSong50Args(split.rest.join(' ')), { color, query: q }, `曲名侧：${msg}`)
+    check(split)
+  }
 })
 
 test('变体白名单：命中常见形态 + **捕获组必须存在**（漏了就是「认领但永不回复」）', () => {

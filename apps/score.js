@@ -24,6 +24,7 @@ import {
   DIFF_COLORS, collectDesigners, isTimeKeyword, resolveAllCondition, resolveDesigner, resolveVariant,
   variantTokenPattern,
 } from '../lib/variantSpec.js'
+import { simErrorText, splitSimTokens } from '../lib/simScore.js'
 
 const H = () => head()
 
@@ -257,8 +258,12 @@ export class MaiScore extends plugin {
   }
 
   /**
-   * `#mai 歌50 [难度色]<曲名|id|别名>`：整张 B50 全是同一首歌（V1）
+   * `#mai 歌50 [难度色]<曲名|id|别名> [模拟参数…]`：整张 B50 全是同一首歌（V1）
    * 多候选同样走 pickSong 序号选择（与 `#mai score` 一致）
+   *
+   * 模拟参数（达成率/评级/同步/DX/标志，见 lib/simScore.js）**先**从右端剥出来，
+   * 剩下的 token 才交给 `parseSong50Args` —— 后者的入参形态与返回值是既有契约
+   * （tests/variantRules.test.js 用 deepEqual 钉死），这里刻意不动它。
    */
   async song50(e) {
     if (!(await ensureReady(e))) return true
@@ -267,11 +272,18 @@ export class MaiScore extends plugin {
       await this.reply(`请输入曲目，例如「#${H()} 歌50 紫茄子」或「#${H()} 歌50 799 红」。`, true)
       return true
     }
+    // 语法问题优先于查曲：只给了 FDX+/N星 却没给达成率或评级时，报错引导而不是静默回落到真实成绩
+    const { rest, sim, error } = splitSimTokens(raw)
+    if (error) {
+      await this.reply(simErrorText(error, { cmdHead: H() }), true)
+      return true
+    }
+
     const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
     if (!got) return true
 
-    const { color, query } = parseSong50Args(raw)
-    // 粘连色字（紫茄子）：先按剥离后的曲名查；查不到再整体当曲名重试
+    const { color, query } = parseSong50Args(rest.join(' '))
+    // 粘连色字（紫茄子）：先按剥离后的曲名查；查不到再整体当曲名重试（模拟参数不拼回去）
     let found = query ? findSongCandidates(query, mai) : null
     let levelIndex = color ? DIFF_COLORS.indexOf(color) : null
     if (!found && color) {
@@ -285,11 +297,11 @@ export class MaiScore extends plugin {
 
     if (found.multi) {
       awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
-        await this.reply(toSegment(await drawSong50(got.user, song, levelIndex)), true)
+        await this.reply(toSegment(await drawSong50(got.user, song, levelIndex, sim)), true)
       })
       return true
     }
-    await this.reply(toSegment(await drawSong50(got.user, found.song, levelIndex)), true)
+    await this.reply(toSegment(await drawSong50(got.user, found.song, levelIndex, sim)), true)
     return true
   }
 

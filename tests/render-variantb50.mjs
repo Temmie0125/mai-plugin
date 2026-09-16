@@ -44,6 +44,7 @@ const { plateTableView } = await import('../lib/render/tableViews.js')
 const { processPlateTable } = await import('../lib/tableData.js')
 const { variantBest50 } = await import('../lib/variantB50.js')
 const { AP_SPEC, resolveVariant, repeatSpec } = await import('../lib/variantSpec.js')
+const { defaultLevelIndex, simRecord, splitSimTokens } = await import('../lib/simScore.js')
 const { VERSION_MAP } = await import('../lib/constants.js')
 
 const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'out')
@@ -135,13 +136,14 @@ const PLAYER = {
   name_plate: null,
 }
 
-/** 变体出图（视图 → 渲染） */
-async function shotVariant(name, { records, spec, theme = 'prism_plus', label }) {
+/** 变体出图（视图 → 渲染；labelTail 见 b50View 的 variantLabelTail） */
+async function shotVariant(name, { records, spec, theme = 'prism_plus', label, labelTail = null }) {
   const { best50, total, candidates } = variantBest50(records, spec, { totalList: mai.totalList })
   console.log(`  · ${name}: candidates=${candidates} B35=${best50.sd.length} B15=${best50.dx.length} total=${total}`)
   const view = b50View({
     theme, qqid: null, player: { ...PLAYER, rating: total }, best50,
-    variantLabel: label ?? spec.label, serviceName: 'Diving-Fish', botName: 'MaiTest',
+    variantLabel: label ?? spec.label, variantLabelTail: labelTail,
+    serviceName: 'Diving-Fish', botName: 'MaiTest',
   })
   return await shot(name, await renderBest50(view))
 }
@@ -185,6 +187,28 @@ results['variant-song50'] = await shotVariant('variant-song50', {
   records,
   spec: repeatSpec({ song_id: song50Song.song_id, level_index: song50Rec.level_index },
     `歌50 · ${song50Song.song_name}`),
+})
+
+// 歌50 模拟（lib/simScore.js）：合成成绩填池，**records 传空数组**（模拟路径不读成绩）。
+// 刻意挑曲库里最长的曲名 —— 横幅要放「歌50 · <曲名> · 模拟 101.0000% FDX+ 5★ AP+」，
+// 这是全页最长的一条文案，用它验 R2（横幅不压称号框与成绩格）。
+const simSong = SONGS().reduce((a, b) => (b.song_name.length > a.song_name.length ? b : a))
+const simLi = defaultLevelIndex(simSong)
+const simSpec = splitSimTokens('理论 FDX+ 5星 AP+')
+const built = simRecord({
+  song: simSong,
+  levelIndex: simLi,
+  levelValue: simSong.difficulties[simLi].level_value,
+  dxMax: simSong.difficulties[simLi].dx_score,
+  sim: simSpec.sim,
+})
+if (built.error) throw new Error(`模拟成绩构造失败：${JSON.stringify(built.error)}`)
+results['variant-song50-sim'] = await shotVariant('variant-song50-sim', {
+  records: [],
+  label: `歌50 · ${simSong.song_name}`,
+  labelTail: `· 模拟 ${built.summary}`,   // 与 handler.drawSong50 一致：尾段不可被截断
+  spec: repeatSpec({ song_id: simSong.song_id, level_index: simLi },
+    `歌50 · ${simSong.song_name}`, built.record),
 })
 
 // =====================================================================

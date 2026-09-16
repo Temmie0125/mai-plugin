@@ -235,6 +235,9 @@ test('护栏⑤（源码级）：随心配变体三件套与命令层不出现�
   // 这条把《b50扩展实现设计.md》§9 的承诺锁进测试：将来给变体「顺手写个缓存」会立刻失败。
   const targets = [
     'lib/variantSpec.js', 'lib/variantB50.js', 'lib/b50Core.js', 'apps/score.js',
+    // 歌50 模拟成绩（达成率/评级 → 合成 PlayedResult）同样只读不写：
+    // 它连 records 都不读，更不该出现任何写盘调用
+    'lib/simScore.js',
   ]
   const forbidden = [
     [/\.writeB50\s*\(/, 'scoreCache.writeB50'],

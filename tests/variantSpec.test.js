@@ -292,6 +292,14 @@ test('歌50：重复填充规格（V1）', () => {
   assert.equal(spec.songId, 799)
   assert.equal(spec.levelIndex, 3)
   assert.equal(spec.label, '茄子')
+  // 第三参（模拟成绩）缺省为 null —— 老调用零改动
+  assert.equal(spec.record, null)
+})
+
+test('歌50：预置成绩透传（模拟模式，见 lib/simScore.js）', () => {
+  const record = { song_id: 799, level_index: 3, rating: 305 }
+  const spec = repeatSpec({ song_id: 799, level_index: 3 }, '歌50 · 白潘 · 模拟 …', record)
+  assert.equal(spec.record, record, 'record 应原样透传给 variantBest50')
 })
 
 // ---------------------------------------------------------------- V26 / V30

@@ -22,6 +22,7 @@ if (!global.logger) {
 }
 
 const { b50View } = await import('../lib/render/views.js')
+const { coloumWidth } = await import('../lib/render/textwidth.js')
 const { mai } = await import('../lib/service.js')
 
 const PLAYER = { name: 'テスト', rating: 15234, course_rank: 5, class_rank: 3, trophy: null, icon: null, name_plate: null }
@@ -122,6 +123,32 @@ test('变体模式：称号位换成条件合计（右端为 x+y，不是真实 
   })
   assert.ok(!textsOf(fitted).includes('れっつゴー！'), '变体模式不展示真实称号')
   assert.ok(textsOf(fitted).includes('其他游戏'), '长变体名（4 字）原样进横幅，不截断')
+})
+
+test('变体横幅：超长时截断的是**前缀**，variantLabelTail 完整保留', () => {
+  const long = `歌50 · ${'あ'.repeat(80)}`
+  const tail = '· 模拟 101.0000% FDX+ 5★ AP+'
+  const view = b50View({
+    player: PLAYER, best50: BEST50, serviceName: 'df', botName: 'b',
+    variantLabel: long, variantLabelTail: tail,
+  })
+  const banner = view.texts.find(t => t.y === 213)
+  assert.ok(banner, '应出现横幅')
+  // 模拟参数是这条命令唯一的信息量，被 '...' 吃掉就等于没标（长曲名首版就是这么翻的）
+  assert.ok(banner.text.endsWith(tail), `尾段必须完整：${banner.text}`)
+  assert.ok(banner.text.includes('...'), `超长前缀应被截断：${banner.text}`)
+
+  // 横幅居中画在 x=700、画布 1400px，22px 字号下 1 列 ≈ 11px ⇒ 不得越过 ≈127 列（1397px）
+  const hardLimit = 127
+  for (const [label, tailText] of [[long, tail], ['FC', null], ['其他游戏', null], [long, null]]) {
+    const v = b50View({
+      player: PLAYER, best50: BEST50, serviceName: 'df', botName: 'b',
+      variantLabel: label, variantLabelTail: tailText,
+    })
+    const text = v.texts.find(t => t.y === 213).text
+    assert.ok(coloumWidth(text) <= hardLimit,
+      `横幅宽度 ${coloumWidth(text)} 列越出画布：${text}`)
+  }
 })
 
 test('变体模式：定数行仍是真实口径（不走 fit 的拟合定数分支）', () => {
