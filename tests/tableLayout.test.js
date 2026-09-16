@@ -196,7 +196,8 @@ test('真实定数表高度锁定', (t) => {
   assert.equal(ratingTableLayout(lv('13')).height, 4005)
   assert.equal(ratingTableLayout(lv('14+')).height, 1395)
   assert.equal(level15Layout(lv('15')['15.0']).height, 1100)
-  assert.equal(lv('15')['15.0'].length, 2)
+  // 2026-09-16 曲库更新后 15.0 由 2 谱面 → 3 谱面（新增 11820 Xaleid◆scopiX）；高度不变
+  assert.equal(lv('15')['15.0'].length, 3)
 })
 
 test('真实完成表高度锁定（已与源预生成 PNG 交叉验证）', (t) => {

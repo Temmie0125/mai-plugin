@@ -9,6 +9,7 @@ import { MusicList } from '../lib/merge/musicList.js'
 import { AliasList } from '../lib/merge/aliasList.js'
 import { mergeMusicData, mergeAliasData } from '../lib/merge/merge.js'
 import { Song, PlayedResult } from '../lib/merge/models.js'
+import { CATEGORY, LXNS_GENRE_CN } from '../lib/constants.js'
 import { dfToPlayresult, lxnsFormatResult } from '../lib/merge/playResult.js'
 import { dfToBest50, dfToPlayer, lxnsToBest50 } from '../lib/merge/player.js'
 
@@ -278,6 +279,95 @@ test('merge：DF 缺白谱由 LXNS 补挂（append_missing_difficulty 只补 Re:
   assert.equal(song.difficulties.length, 5)
   assert.equal(song.difficulties[4].level_index, 4)
   assert.equal(song.difficulties[4].level_value, 9.9)
+})
+
+test('回归：落雪独有曲的 isnew 按大版本块判定，不按子版本', () => {
+  // 症状：水鱼曲库滞后于落雪时才有落雪独有曲；其 `difficulty.version` 是**子版本**
+  // （实测 25504），而 `versions[].version` 是**大版本**（25500），源侧 `newVersion === base.version`
+  // 恒为假 ⇒ 恰是当期的新曲全被判进旧版池 B35、进不了新曲池（实测 2026-09-16：10 个条目，
+  // 例 11820 Xaleid◆scopiX）。口径应与 version_str 一致——都按大版本块（`ver - ver%100`）。
+  const lxSong = (id, title, ver) => ({
+    id, title, artist: 'A', genre: 'maimai', bpm: 180, version: ver,
+    difficulties: {
+      standard: [],
+      dx: [{
+        type: 'dx', difficulty: 3, level: '14+', level_value: 14.9, note_designer: '-', version: ver,
+        notes: { total: 10, tap: 10, hold: 0, slide: 0, touch: 0, brk: 0 },
+      }],
+    },
+  })
+  const lxnsList = {
+    songs: [lxSong(1820, '当期新曲', 25504), lxSong(1800, '上期曲', 25004)],
+    genres: [],
+    versions: [{ id: 23, title: '舞萌DX 2025', version: 25000 }, { id: 24, title: '舞萌DX 2026', version: 25500 }],
+  }
+  const { list } = mergeMusicData({ divingFishList: [], lxnsList, statsMap: {} })
+  assert.equal(list.byId(11820).isnew, true, '子版本 25504 属于当期大版本 25500 ⇒ 应进新曲池')
+  assert.equal(list.byId(11800).isnew, false, '上期大版本块不得进新曲池')
+  assert.equal(list.byId(11820).version_str, 'maimai でらっくす PRiSM PLUS', 'version_str 同按大版本块查表')
+  assert.equal(list.byId(11820).version_int, 25504, 'version_int 仍存落雪原样的子版本（不改语义）')
+})
+
+test('回归：落雪独有曲的 genre 归一到水鱼口径；水鱼已收录曲仍以水鱼为准', () => {
+  // 症状：落雪独有曲直接落 `raw.genre`，合并库混进 `maimai` / `オンゲキCHUNITHM` 这类
+  // 内部串（其余曲目全是水鱼口径中文名），图面分类文字与猜歌提示跟着串味。
+  const lxSong = (id, title, genre) => ({
+    id, title, artist: 'A', genre, bpm: 150, version: 10000,
+    difficulties: {
+      standard: [],
+      dx: [{
+        type: 'dx', difficulty: 3, level: '12', level_value: 12.0, note_designer: '-', version: 10000,
+        notes: { total: 10, tap: 10, hold: 0, slide: 0, touch: 0, brk: 0 },
+      }],
+    },
+  })
+  const dfList = [{
+    id: '1824', title: '水鱼已收录', type: 'DX', ds: [12.0], level: ['12'],
+    charts: [{ notes: [10, 0, 0, 0, 0], charter: '-' }],
+    // 水鱼侧同名曲的 genre 是中文、且 is_new 为真——落雪侧不得覆盖这两项（来源不对称，见 b50 §0.3）
+    basic_info: { title: '水鱼已收录', artist: 'A', genre: '东方Project', bpm: 150, from: 'maimai でらっくす', is_new: true },
+  }]
+  const lxnsList = {
+    songs: [
+      lxSong(1820, 'a', 'maimai'), lxSong(1821, 'b', 'オンゲキCHUNITHM'),
+      lxSong(1822, 'c', '未收录串'), lxSong(1824, '水鱼已收录', '東方Project'),
+    ],
+    genres: [],
+    versions: [{ id: 1, title: '舞萌DX', version: 10000 }],
+  }
+  const { list } = mergeMusicData({ divingFishList: dfList, lxnsList, statsMap: {} })
+
+  assert.equal(list.byId(11820).genre, '舞萌', 'maimai → 舞萌')
+  assert.equal(list.byId(11821).genre, '音击&中二节奏', 'オンゲキCHUNITHM → 音击&中二节奏')
+  assert.equal(list.byId(11822).genre, '未收录串', '表内未收录的串保持原样（宁可显示日文，不猜不归）')
+  assert.equal(list.byId(11824).genre, '东方Project', '水鱼已收录：genre 以水鱼为准，落雪内部串不得覆盖')
+  assert.equal(list.byId(11824).isnew, true, '水鱼已收录：isnew 以水鱼 is_new 旗标为准')
+})
+
+test('落雪 genre 映射表：覆盖落雪全部分类，且映射前后图标一致', () => {
+  // 映射的**口径就是图标**：左右两项在 CATEGORY 里必须指向同一个 info_xxx.png，
+  // 否则按分类筛选（variantSpec 的 GENRE_BY_ICON）会跟着变。落雪新增分类时本表必须同步。
+  const LIVE = ['POPSアニメ', 'niconicoボーカロイド', '東方Project', 'ゲームバラエティ', 'maimai', 'オンゲキCHUNITHM', '宴会場']
+  for (const raw of LIVE) {
+    const cn = LXNS_GENRE_CN[raw]
+    assert.ok(cn, `落雪 genre「${raw}」未收录进 LXNS_GENRE_CN`)
+    assert.ok(CATEGORY[cn], `「${cn}」应能在 CATEGORY 查到图标`)
+    assert.equal(CATEGORY[cn], CATEGORY[raw], `「${raw}」→「${cn}」的图标应一致（筛选口径不许变）`)
+  }
+})
+
+test('落雪 genre 映射表：与落雪真实 genres 表逐条对齐（新增分类即失败）', {
+  skip: fs.existsSync(path.join(STATIC_DATA, 'lxns_music_data.json'))
+    ? false
+    : '资源包缺失，跳过（resources/static/data/ 未就位）',
+}, () => {
+  const { genres } = JSON.parse(fs.readFileSync(path.join(STATIC_DATA, 'lxns_music_data.json'), 'utf8'))
+  assert.ok(genres.length > 0, '落雪 genres 表不应为空')
+  for (const g of genres) {
+    const cn = LXNS_GENRE_CN[g.genre]
+    assert.ok(cn, `落雪 genre「${g.genre}」（${g.title}）未收录进 LXNS_GENRE_CN`)
+    assert.equal(CATEGORY[cn], CATEGORY[g.genre], `「${g.genre}」→「${cn}」的图标应一致`)
+  }
 })
 
 test('别名合并（柚子 + LXNS >1000 加 10000 + 本地，去重保序）', () => {
