@@ -100,7 +100,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 国内直连 GitHub 不畅时，把配置项 `assetsRepo` 改填代理前缀地址即可，例如 `https://gh-proxy.com/https://github.com/Temmie0125/mai-plugin-resource-static.git`。
 
-启动时自动检测：曲绘数 < 500 会红字警告并引导用户下载完整资源。缺失单项素材渲染时在线回退（可配 `assetsOnline`）。
+启动时自动检测：曲绘数 < 500 会红字警告并引导用户下载完整资源。缺失单项素材渲染时在线回退（可配 `assetsOnline`，关闭后渲染不联网、缺图一律用本地默认图）。B50 头部的头像与姓名框切图同样本地优先：资源包内 `mai/icon/<id>.webp`、`mai/plate/<id>.webp`（按收藏品 id 命名，不补零）命中即零网络，缺失才在线取并落盘缓存。
 
 ## 配置
 

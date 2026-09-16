@@ -64,7 +64,7 @@ export function supportGuoba() {
         {
           field: 'assetsOnline',
           label: '在线素材回退',
-          bottomHelpMessage: '本地缺失的曲绘/切图尝试从在线源获取',
+          bottomHelpMessage: '本地缺失的曲绘/切图（含头像、姓名框）尝试从在线源获取；关闭后渲染不联网，缺图用默认图',
           component: 'Switch',
         },
         {
