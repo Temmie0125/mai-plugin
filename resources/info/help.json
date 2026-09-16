@@ -200,6 +200,11 @@
         "title": "rise [等级] [分数]",
         "eg": "#{head} rise 14 20",
         "desc": "上分推荐（@他人可查对方）"
+      },
+      {
+        "title": "com|calc|计算 <定数> <达成率>",
+        "eg": "#{head} calc 13.6 100.5",
+        "desc": "单曲 Rating 计算器（免绑定）"
       }
     ]
   },

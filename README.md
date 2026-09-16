@@ -39,8 +39,9 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai bind lxns|df|qq / bind fc [好友码] / unbind <lxns|df|qq> / source / theme
 #   bind fc：只绑好友码（免 OAuth）——可查 B50 / AP50 / 单曲；不带参数时按 QQ 自动解析；绑定即切到落雪
 #   拟合b50、随心配、完成表等**全量成绩**功能需要「bind lxns」授权（开发者接口只给不含达成率的简化成绩）
-#mai guess / guessill / letter（开字母）/ fortune（今日舞萌）/ rand / rise
+#mai guess / guessill / letter（开字母）/ fortune（今日舞萌）/ rand / rise / com|calc|计算 <定数> <达成率>
 #   游戏进行中：开 <一个字符> 翻开所有该字符 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
+#   com|calc|计算：单曲 Rating 计算器（免绑定），如 #mai calc 13.6 100.5
 #mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票
 #   / alias local <ID> <别名> 本地别名 / alias sync 更新别名库
 #mai push on|off 群别名推送开关 / push global on|off 全局（仅主人）
