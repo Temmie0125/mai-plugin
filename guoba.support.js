@@ -126,6 +126,24 @@ export function supportGuoba() {
           component: 'Input',
           bottomHelpMessage: '默认 https://auth.diving-fish.com',
         },
+        {
+          field: 'dfScope',
+          label: '水鱼 OAuth 权限',
+          bottomHelpMessage: '申请 OAuth 应用时勾选的权限，需与之一致；留空回退为仅「读取舞萌 DX 成绩」',
+          // 多选列表框：权限名长且枚举固定（与水鱼账号服务的授权项一一对应）；
+          // 写回为数组，lib/client/divingfishOauth.js 的 resolveDfScope 兼容数组/空格串
+          component: 'Select',
+          componentProps: {
+            mode: 'multiple',
+            placeholder: '请选择 OAuth 权限',
+            options: [
+              { label: '读取你的用户名、昵称、头衔 (profile)', value: 'profile' },
+              { label: '读取你的账号邮箱及其是否已验证 (email)', value: 'email' },
+              { label: '读取你在查分器的资料：Rating、姓名框等 (prober.profile.read)', value: 'prober.profile.read' },
+              { label: '读取你的舞萌 DX 成绩 (prober.records.read)', value: 'prober.records.read' },
+            ],
+          },
+        },
         { label: '落雪查分器（LXNS）', component: 'SOFT_GROUP_BEGIN' },
         {
           field: 'lxnsDevToken',
@@ -257,9 +275,13 @@ export function supportGuoba() {
           component: 'Input',
         },
       ],
-      // 读取/写回当前配置（键与 yaml 一一对应）
+      // 读取/写回当前配置（键与 yaml 一一对应）；dfScope 转数组供多选框回显
       getConfigData() {
-        return Config.getUserCfg('config')
+        const data = { ...Config.getUserCfg('config') }
+        if (typeof data.dfScope === 'string') {
+          data.dfScope = data.dfScope.split(/\s+/).filter(Boolean)
+        }
+        return data
       },
       async setConfigData(data) {
         for (const [key, value] of Object.entries(data)) {

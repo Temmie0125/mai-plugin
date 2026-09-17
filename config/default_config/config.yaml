@@ -33,6 +33,13 @@ proberProxy: false
 dfClientId: ''
 dfClientSecret: ''
 dfAuthUrl: 'https://auth.diving-fish.com'
+# OAuth 权限范围：多个权限用空格隔开（面板中为多选）。可选项：
+#   profile              读取你的用户名、昵称、头衔
+#   email                读取你的账号邮箱及其是否已验证
+#   prober.profile.read  读取你在查分器的资料（Rating、姓名框等）
+#   prober.records.read  读取你的舞萌 DX 成绩
+# 留空或含未知权限名时回退为 prober.records.read
+dfScope: 'prober.records.read'
 
 # ===== 落雪查分器（LXNS） =====
 # 落雪开发者 Token（使用落雪数据源查分必需）
