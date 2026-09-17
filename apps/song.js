@@ -4,6 +4,8 @@
  * - song：精确直查 → 曲目详情卡（1 命中）；多条结果自动降级为列表（≤5 文本 / >5 分页图）
  * - search：检索列表语义（对齐 phi-plugin `#phi search` 心智）——跳过详情卡分支，一律列表
  *   两者共享 parseSongQuery：曲名/别名/ID + 定数|bpm|曲师|谱师 前缀过滤
+ *   谱师前缀先过别名表归一到曲库原名（哈皮 → はっぴー，resources/info/designer_alias.json，
+ *   与「<谱师>50」变体同源）——曲库存的是原名，中文叫法直接比对必然落空
  *   数值语法：`定数14`/`定数14.5`、等级字面 `定数14+`（游戏内 14.6+ 显示「14+」）、
  *   区间必须显式连接符 `定数14-15`/`定数14~15`（含全角 ～/－）、尾部数字为页码；
  *   无连接符的双数字 = 单值 + 页码（如 `定数14 4`，防区间误判）；bpm 语法同构
@@ -17,6 +19,7 @@ import { toSegment, botName } from '../lib/render/picmodle.js'
 import { mai, ensureReady, updateLocalAlias, rebuildAliasFromCache } from '../lib/service.js'
 import { YuzuChaNAPI } from '../lib/client/yuzuchan.js'
 import { awaitPickSong, handlePickSong } from '../lib/pickSong.js'
+import { resolveDesigner, collectDesigners } from '../lib/variantSpec.js'
 
 const H = () => head()
 
@@ -162,8 +165,25 @@ export function parseSongQuery(rawArgs) {
   }
   const result = cmd === '曲师'
     ? mai.totalList.filter({ artist: name })
-    : mai.totalList.filter({ charter: name, all_diff: false })
+    : filterByCharter(name)
   return { result, page, source: 'filter' }
+}
+
+/**
+ * 谱师过滤：先过别名表归一到曲库原名，再交给 `filter({charter})`（contains 匹配）
+ *
+ * 曲库存的是原名（はっぴー / 譜面-100号 / 鳩ホルダー），用户按常见中文叫法（哈皮 /
+ * 谱面100号 / 鸠）输入时原名比对必然落空——「<谱师>50」变体早就接了这张表
+ * （resolveDesigner），查歌族此前漏接。归一后仍无命中就回退原文，保住 contains
+ * 语义（原名片段、只写一半的名字照旧可用）。
+ */
+function filterByCharter(name) {
+  const mapped = resolveDesigner(name, { designers: collectDesigners(mai.totalList) })?.label
+  if (mapped && mapped !== name) {
+    const hit = mai.totalList.filter({ charter: mapped, all_diff: false })
+    if (hit.length) return hit
+  }
+  return mai.totalList.filter({ charter: name, all_diff: false })
 }
 
 /** 单曲文本行（源 `f"「{id}」":<7` 语义） */

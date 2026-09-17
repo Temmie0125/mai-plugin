@@ -111,7 +111,8 @@ const REG_VERSION_PLATE_SAY = () => new RegExp(
  */
 export function parseVersionPlate(ver, plan, kindRaw, pageRaw) {
   let v = ver
-  if (PLATE_CN[v]) v = PLATE_CN[v]
+  // 简繁归一查表用 Object.hasOwn：本函数是导出面，不能假定调用方一定已经按 VERSION_CHARS 限过形状
+  if (Object.hasOwn(PLATE_CN, v)) v = PLATE_CN[v]
   // 「真」没有将牌图（资源包 plate_version 下真只有 極/神/舞舞），大将复用将图（V19）故一并拦下——
   // 放进去只会在 plateTableView 的缺图守卫上抛错，用户拿到的是笼统的「未知错误」
   if (`${v}${plan}` === '真将' || `${v}${plan}` === '真大将') return { error: '真系没有真将哦。' }

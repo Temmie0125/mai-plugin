@@ -8,8 +8,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  CATEGORY_ALIAS, DIFF_COLORS, collectDesigners, displayRank, isTimeKeyword, normalizeDesigner,
-  normalizeRank, repeatSpec, resolveAllCondition, resolveDesigner, resolveVariant, resolveVersion,
+  CATEGORY_ALIAS, DIFF_COLORS, collectDesigners, displayRank, isTimeKeyword, listPresetOf,
+  normalizeDesigner, normalizeRank, repeatSpec, resolveAllCondition, resolveDesigner, resolveVariant,
+  resolveVersion,
   variantHelp, variantHelpTokens, variantTokens, variantTokenPattern, VARIANT_SPECS,
 } from '../lib/variantSpec.js'
 
@@ -87,6 +88,21 @@ test('评级族：寸 / 锁 / 仅 的形态与别名（含鸟加/鸟）', () => 
   assert.equal(normalizeRank('s+'), 'sp')
   assert.equal(normalizeRank('SS'), 'ss')
   assert.equal(normalizeRank('SSZ'), null)
+  // 原型链上的名字不算评级（裸取 MAP[t] 会让 'toString' 返回 Object.prototype 上的函数）
+  for (const bad of ['toString', 'constructor', '__proto__', 'valueOf']) {
+    assert.equal(normalizeRank(bad), null, `${bad} 不应识别为评级`)
+  }
+})
+
+test('分数列表关键词：识别 / 大小写 / 拒收（含原型链名字）', () => {
+  assert.equal(listPresetOf('理论'), 'theory')
+  assert.equal(listPresetOf('AP+'), 'theory')
+  assert.equal(listPresetOf('新歌'), 'new')
+  assert.equal(listPresetOf('旧版本'), 'old')
+  assert.equal(listPresetOf('没这个关键词'), null)
+  for (const bad of ['toString', 'constructor', '__proto__', 'hasOwnProperty']) {
+    assert.equal(listPresetOf(bad), null, `${bad} 不应识别为关键词`)
+  }
 })
 
 test('仅/寸/锁：判定边界（需求文档的两个示例区间）', () => {
@@ -240,13 +256,15 @@ test('筛选：类型与难度', () => {
 
 test('筛选：谱师（精确 + 中文别名 + 未知一律 null）', () => {
   const designers = new Set(['はっぴー', 'jack', '譜面-100号', '翠楼屋', 'small bird'])
-  const alias = { 哈皮: 'はっぴー', '谱面-100号': '譜面-100号' }
+  const alias = { 哈皮: 'はっぴー', '谱面-100号': '譜面-100号', happy: 'はっぴー' }
   const opts = { designers, alias }
 
   const hapi = resolveDesigner('哈皮', opts)
   assert.ok(hapi, '中文别名应命中')
   assert.equal(hapi.match(rec(), song()), true, '曲库原名是 はっぴー')
   assert.equal(hapi.match(rec(), songWithDesigner('Jack')), false)
+
+  assert.equal(resolveDesigner('Happy', opts).label, 'はっぴー', '别名表键大小写折叠（表里是 happy）')
 
   assert.equal(resolveDesigner('谱面-100号', opts).match(rec(), songWithDesigner('譜面-100号')), true)
   assert.equal(resolveDesigner('Jack', opts).key, 'designer-jack', '大小写折叠')

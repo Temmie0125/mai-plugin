@@ -99,6 +99,11 @@ test('divingfishOauth：tokenSubject 只解不验 / resolveDfScope 兜底', asyn
   assert.equal(resolveDfScope('prober.records.read  prober.profile.read'), 'prober.records.read prober.profile.read')
   assert.equal(resolveDfScope(['profile', 'email']), 'profile email')
   assert.equal(resolveDfScope('prober.records.read typo-scope'), DEFAULT_DF_SCOPE, '未知权限名回退默认')
+  // 原型链上的名字不算已知权限（曾用 `in`，'constructor' 会被当合法权限发出去）
+  for (const bad of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    assert.equal(resolveDfScope(bad), DEFAULT_DF_SCOPE, `${bad} 应回退默认`)
+    assert.equal(resolveDfScope(['profile', bad]), DEFAULT_DF_SCOPE, `${bad} 混在数组里也应回退`)
+  }
 })
 
 // ---- service/theme 索引辅助（merge/models.js）----

@@ -88,6 +88,16 @@ test('越界裸数字不算模拟 token —— 保住 `紫 799` / `799 紫` 这�
   assert.match(simErrorText(bad.error, { cmdHead: 'mai' }), /dx1145/)
 })
 
+test('原型链上的词不算模拟 token（曾静默产出一个假成绩）', () => {
+  // 'toString' 曾命中 RANK_CN 原型链 → 合成出达成率 0 的「假成绩」；'constructor' 命中 SYNC_TOKEN
+  for (const t of ['toString', 'constructor', '__proto__', 'valueOf', 'hasOwnProperty']) {
+    const r = splitSimTokens(`白潘 ${t}`)
+    assert.equal(r.sim, null, `${t} 不应被当成模拟参数`)
+    assert.equal(r.error, null, `${t} 不应报错`)
+    assert.deepEqual(r.rest, ['白潘', t], `${t} 应原样退回曲名`)
+  }
+})
+
 test('splitSimTokens：至少留一个 token 当曲名（`#mai 歌50 D` 不被吃空）', () => {
   const r = splitSimTokens('D')
   assert.equal(r.sim, null)

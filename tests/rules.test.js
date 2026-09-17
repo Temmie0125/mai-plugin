@@ -127,6 +127,16 @@ test('parseSongQuery：粘连前缀 / 空格 / 来源标记 / 页码保留', asy
     mai.totalList.filter({ title: s.song_name }).length === 1)
   assert.ok(titleSong, '应能找到唯一标题样本')
   assert.equal(parseSongQuery(titleSong.song_name).source, 'title')
+  // 谱师别名表接入查歌族（resources/info/designer_alias.json，与「<谱师>50」同源）
+  const byDesigner = s => parseSongQuery(`谱师 ${s}`).result.length
+  assert.ok(byDesigner('はっぴー') > 0, '曲库原名应命中')
+  assert.equal(byDesigner('哈皮'), byDesigner('はっぴー'), '中文别名应等同原名')
+  assert.ok(byDesigner('譜面-100号') > 0)
+  assert.equal(byDesigner('谱面100号'), byDesigner('譜面-100号'), '别名表「谱面100号」应等同原名')
+  assert.equal(byDesigner('Happy'), byDesigner('happy'), '别名表 latin 键大小写折叠')
+  assert.ok(byDesigner('はっぴ') > 0, '原名片段仍走 contains（别名表未收录也照旧可用）')
+  assert.equal(byDesigner('不存在的谱师'), 0, '未收录名字无命中、不报错')
+  assert.equal(parseSongQuery('谱师 哈皮 2').page, 2, '别名路径同样吃页码')
 })
 
 // ---- 命令头↔子命令 空格可选（#maisong / #maihelp），子命令↔参数仍须空格 ----
