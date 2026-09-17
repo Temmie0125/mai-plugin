@@ -18,6 +18,8 @@
 
 TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）开源项目，按 Yunzai 生态习惯本地化重写。
 
+有任何问题/建议/反馈请及时在[Issues](https://github.com/Temmie0125/mai-plugin/issues)提出。欢迎[PR](https://github.com/Temmie0125/mai-plugin/pulls)。
+
 同时兼容 **OneBot（QQ 号）** 与 **官方 QQBot（openid）** 两种事件协议：绑定与查询以平台用户标识原样落库。openid 环境下水鱼查分器按 QQ 代查受限——可发送 `#mai bind qq <你的QQ号>` 主动补充游戏 QQ 解锁水鱼（`bind qq clear` 解除）；落雪数据源无需 QQ、全功能可用。
 
 ## 命令总览
