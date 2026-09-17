@@ -14,6 +14,8 @@
 
 </div>
 
+---
+
 ## 简介
 
 TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)（Yuri-YuzuChaN）开源项目，按 Yunzai 生态习惯本地化重写。
@@ -22,9 +24,14 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 
 同时兼容 **OneBot（QQ 号）** 与 **官方 QQBot（openid）** 两种事件协议：绑定与查询以平台用户标识原样落库。openid 环境下水鱼查分器按 QQ 代查受限——可发送 `#mai bind qq <你的QQ号>` 主动补充游戏 QQ 解锁水鱼（`bind qq clear` 解除）；落雪数据源无需 QQ、全功能可用。
 
+---
+
 ## 命令总览
 
 指令前缀 `#` 或 `/` 均可触发；命令头默认 `mai`，可在配置中修改。发送 `#mai help` 查看完整帮助图。
+
+<details>
+<summary><strong>命令列表</strong></summary>
 
 ```
 #mai b50 / ap50 / 拟合b50 / 随心配b50 / score <曲名> / ginfo <曲名> / rank <用户名|页码> / myrank
@@ -56,9 +63,14 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai update —— 刷新并缓存本人 B50 与全量成绩（人人可用，非管理命令）
 ```
 
+</details>
+
 口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表` 等。
 
-> 相比原插件的行为变化：所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）。
+<details>
+<summary><strong>相比原插件的行为变化</strong></summary>
+
+> 所有查歌命令统一为 `#mai <子命令>`（`song` 精确查询并返回详情卡，`search` 检索并返回列表——与 phi-plugin 的 search 用法保持一致）；原 `id nnn` 改为 `#mai song <纯数字>`；原「更新定数表/更新完成表」已删除（改为运行时渲染）。
 
 > **`update` 一词的三个归属**（曾一度全面回避该词，现按作用域划清）：`#mai 更新` 更新**插件本体**（仅主人）、`#mai sync` 同步**曲库**（仅主人）、`#mai update` 刷新**本人成绩缓存**（人人可用）。三者正则两两不交，由 `tests/manage.test.js` 与 `tests/fitRules.test.js` 双向锁定。
 
@@ -73,6 +85,10 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 > **歌50 模拟成绩**：`#mai 歌50 [难度色]<曲名> [达成率|评级] [同步] [DX] [标志]`，参数顺序任意。`理论` = `101.0000%` = `AP+`；评级（`SS+`/`SSS`/`鸟+` …）取该档**起算线**（SS+=99.5、SSS=100）。给了达成率或评级就是纯模拟——**不读你的实际成绩**，没打过的曲也能出图；没写难度色时取该曲定数最高的谱面。达成率 101 时标志强制 `AP+`。DX 三写法：`dx1145`（绝对分）/ `dx99%`（占 Max DX 百分比）/ `N星`。缺省档位：理论 → `FDX+`/`5星`/`AP+`，其余 → `FDX`/`3星`/`FC+`。横幅会展开全部参数，方便核对。
 
 > `#mai fsline`：单曲分数线成图，内含「分数线 / DX 等级 / 目标评级 / BREAK 等效数量」四张表，全部由谱面物量（各判定音符数）推出、与达成率无关；带达成率时在图外附加一行该达成率下的容错文本。难度色与曲名顺序可互换（`紫799` / `799 紫`），达成率可省略（只出图）。`#mai fsline 帮助` 查看详细用法。
+
+</details>
+
+---
 
 ## 安装与资源
 
@@ -95,7 +111,8 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 首次执行自动克隆资源仓库 `https://github.com/Temmie0125/mai-plugin-resource-static.git`；之后再次执行即为**增量更新**（已是最新会直接回执，不会重复下载）。若 `resources/static/` 下已手工放好资源包（下方两条迁移途径），命令会**就地更新**该目录，只下载缺失或变更的文件，不会重新下载 600MB；目录内的 `data/` 不会被清除，迁移用户的 `user.db` 与曲库缓存均保留。
 
-也可以先手工放好资源包、再执行一次 `#mai download` 接管：
+<details>
+<summary>也可以先手工放好资源包、再执行一次 `#mai download` 接管：</summary>
 
 - **老用户（从 NoneBot 版迁移）**：把 NoneBot 资源包 `static/` 目录**整体复制**过来：
 
@@ -107,9 +124,14 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 - **新用户**：下载静态资源包压缩包（请前往[源项目主页](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)进行下载），解压到 `plugins/mai-plugin/resources/`，保证目录结构为 `resources/static/mai/...`。
 
+</details>
+
+代理配置：
 国内直连 GitHub 不畅时，把配置项 `assetsRepo` 改填代理前缀地址即可，例如 `https://gh-proxy.com/https://github.com/Temmie0125/mai-plugin-resource-static.git`。
 
 启动时自动检测：曲绘数 < 500 会红字警告并引导用户下载完整资源。缺失单项素材渲染时在线回退（可配 `assetsOnline`，关闭后渲染不联网、缺图一律用本地默认图）。B50 头部的头像与姓名框切图同样本地优先：资源包内 `mai/icon/<id>.webp`、`mai/plate/<id>.webp`（按收藏品 id 命名，不补零）命中即零网络，缺失才在线取并落盘缓存。
+
+---
 
 ## 配置
 
@@ -122,15 +144,19 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 > [!NOTE]
 > 使用水鱼 OAuth 绑定时，用户发送 `#mai bind df`，BOT 会返回一条授权链接：打开链接并登录水鱼账号，确认页面上显示的绑定身份后点击「同意授权」，再把**页面给出的确认码发回给 BOT**，绑定即告完成。确认码形如 `BCDF-GHJK-LMNP`，只能使用一次，且只能由发起绑定的本人回填——这一步确认「点同意的人」和「发起绑定的人」是同一个人，请勿使用或转发他人发来的确认码。绑定关系与授权范围保存在水鱼服务端，BOT只保管应用凭据，不保存任何用户令牌；用户可随时在 https://auth.diving-fish.com/apps 撤销授权。未绑定的用户仍可使用 `#mai b50` 指令。
+>
 > **从旧版本升级的用户请重新执行一次 `#mai bind df`**：旧流程把链接发出去即算完成、并未向水鱼核对，「绑定过」不等于授权已经建立；现在只有收到确认码并兑换成功才会回「授权完成」。
 
 > [!WARNING]
 > 开发者 token 已被水鱼查分器弃用：它能按 QQ 号读取任意用户的成绩，用户从未对 BOT 做过授权，也无法撤销。水鱼已停止签发新的开发者 token，并将在过渡期后关闭该鉴权方式。请申请 OAuth 应用并配置 `dfClientId` 与 `dfClientSecret`。
+>
 > 您在申请水鱼 OAuth 应用时，请至少勾选「读取你在查分器的资料（Rating、姓名框等）」和「读取你的舞萌 DX 成绩」两项权限。`dfScope` 是绑定时向用户申请的范围（默认只申请「读取你的舞萌 DX 成绩」，Guoba 面板中为多选，多个权限用空格隔开），不能超出您申请应用时获得的权限。权限不足本插件对应功能将无法工作。
 
 > [!NOTE]
 > 使用落雪 OAuth 绑定时，可在群聊或私聊发送 `#mai bind lxns`，按提示完成授权后发送授权码或完整回调链接；群聊发起的绑定也可以转到同一 Bot 的私聊完成。若设置 `lxnsBindPrivateOnly=true`，群聊只会提示用户添加 Bot 好友后前往私聊。部分 OneBot 实现无法接收陌生人的私聊消息，因此该选项默认关闭。
+>
 > 您在申请落雪 OAuth 应用时，OAuth 权限范围请选择前三项，不包括「读取个人API秘钥」。权限不足本插件对应功能将无法工作。
+>
 > 绑定后还需在落雪查分器「账号设置 → 隐私设置」中开启「允许读取玩家信息」「允许读取谱面成绩」「允许读取历史成绩」三项，否则 BOT 无法获取您的落雪数据（查询被拒时回复中也会给出此引导）。
 
 > [!NOTE]
@@ -151,6 +177,8 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 自定义分发：改仓库 remote 即可 `git remote set-url origin <你的仓库地址>`；资源包地址同理，改配置项 `assetsRepo`。
 
+---
+
 ## 运行数据
 
 - `data/user.json`：用户绑定与主题（自 NoneBot 版 `user.db` JSON 化）；
@@ -163,12 +191,16 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 > [!IMPORTANT]
 > 若在宿主 `config/config/bot.yaml` 里启用了**定时更新**（`update_cron`）或**间隔更新**（`update_time`），请把本插件的 `autoSyncTime` 与之**错开**，避免同步进行到一半被宿主重启打断。特别注意 `update_time` 是「启动后 N 分钟」的间隔模式，触发时刻**随启动时间浮动**，无法通过选定一个固定时间点来规避——因此本插件的写盘一律采用**原子替换**（先写 `.tmp` 再 rename），被任何来源的重启打断都不会留下截断的缓存文件。
 
+---
+
 ## 美术与版权声明（必读）
 
 本插件的卡面布局、切图组合与配色方案**派生自 nonebot-plugin-maimaidx（作者 Yuri-YuzuChaN，https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx） 的美术设计**，仅作信息级还原复用，相关权利归原作者所有，感谢其开源贡献。
 
 - 舞萌DX 相关素材版权归 SEGA 等原权利方所有，素材包由用户自行下载，请于 24 小时内自行删除或支持正版；
 - 资源包内字体仅限个人学习研究，禁止商用；
+
+---
 
 ## 开发
 
@@ -194,8 +226,12 @@ node plugins/mai-plugin/tests/render-fsline.mjs    # 渲染冒烟 → tests/out/
 # 四表算法的对照基准由 tests/refs/gen-fsline-ref.mjs 真跑用户样板生成（fsline_ref.json 已入库，无需样板）
 ```
 
+---
+
 ## 许可
 
+<details>
+<summary>点击展开完整项目许可</summary>
 本项目 **mai-plugin** 整体以 **GNU General Public License v3.0（GPL-3.0）** 发布，完整许可证文本见仓库根目录 [`LICENSE`](LICENSE)。你可以在 GPL-3.0 条款下使用、修改和分发本项目；分发修改版、衍生作品或打包产物时，必须按 GPL-3.0 提供相应源代码，保留版权与许可声明，并附带 GPL-3.0 全文。
 
 本项目移植自 [nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx)，该源项目采用 **MIT License**。MIT 许可允许商业或非商业使用，但要求在所有副本或重要部分中保留原始版权声明和 MIT 许可声明。MIT 与 GPLv3 兼容；因此，源自该项目的代码部分在被纳入本项目后，整体按 GPL-3.0 分发，同时其原始 MIT 许可与版权声明继续适用，分发时不得移除。原始 MIT 许可与版权声明收录于 [`MIT-nonebot-plugin-maimaidx.txt`](MIT-nonebot-plugin-maimaidx.txt)。
@@ -212,9 +248,63 @@ node plugins/mai-plugin/tests/render-fsline.mjs    # 渲染冒烟 → tests/out/
 - 舞萌DX 相关素材、字体等第三方资源的版权限制，详见上文“美术与版权声明”。
 
 本项目按“现状”提供，不提供任何明示或默示担保。以上内容仅为许可证说明，不构成法律意见；如有疑问，请咨询专业律师。
+</details>
+
+---
+
+## 贡献指南
+
+欢迎任何形式的贡献！无论是 Bug 反馈、功能建议，还是代码贡献，都请按照以下流程：
+
+### 提交 Issue
+
+- 请先搜索 [Issues](https://github.com/Temmie0125/mai-plugin/issues) 确认是否已有类似问题
+- 使用清晰的标题，并详细描述问题或建议
+- 如果涉及报错，请提供完整日志和复现步骤
+
+### Pull Request
+
+1. Fork 本仓库并 clone 到本地
+2. 创建新的分支：`git checkout -b feature/your-feature`
+3. 提交更改，遵循现有代码风格，确保使用E-S Module
+4. 确保插件在 Yunzai 环境下测试通过
+5. 发起 [Pull Request](https://github.com/Temmie0125/mai-plugin/pulls)，描述改动内容
+
+---
+
+## 反馈与交流
+
+- **GitHub Issues**：[点击反馈](https://github.com/Temmie0125/mai-plugin/issues)
+- **作者 QQ**：1179755948（请备注“舞萌DX插件”）
+- **官方群**：481221622（也是Hikari-Bot官方群哦~）
+- **Yunzai 社区**：欢迎在官方社区交流使用心得
+
+---
+
+## 贡献者
+
+感谢以下贡献者对本项目做出的贡献:
+
+<a href="https://github.com/Temmie0125/mai-plugin/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Temmie0125/mai-plugin" />
+</a>
+
+![Alt](https://repobeats.axiom.co/api/embed/d1d8ee6d3a9f98eae8bc7b20a3fd1c532b643a8d.svg "Repobeats analytics image")
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=temmie0125%2Fmai-plugin&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=temmie0125/mai-plugin&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=temmie0125/mai-plugin&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=temmie0125/mai-plugin&type=date&legend=top-left" />
+ </picture>
+</a>
+
+---
 
 ## 鸣谢
 
 - [Yuri-YuzuChaN/nonebot-plugin-maimaidx](https://github.com/Yuri-YuzuChaN/nonebot-plugin-maimaidx) —— 美术设计与功能蓝本
 - [Catrong/phi-plugin](https://github.com/Catrong/phi-plugin) —— Yunzai 侧架构范式参考
-- TRSS-Yunzai 团队
+- [TRSS-Yunzai](https://github.com/TimeRainStarSky/Yunzai) 团队
