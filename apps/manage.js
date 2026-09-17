@@ -8,6 +8,8 @@
  * - 同步曲库：`#mai sync` 与每日定时 task 共用 lib/sync.js 的同一把锁（P3 实施文档 §3）
  * - 更新成功回最近提交日志（合并转发不支持引用回复，一律不引用，避免多发一条空引用消息）；
  *   对齐 phi-plugin 的重启判断：提交信息带 √/✓ 视为热更安全，否则更新完毕自动重启宿主；
+ *   重启走宿主共享的 `plugins/other/restart.js`（Restart 类，phi/mil 同款）——它重启前把
+ *   发起人写进 redis、进程起来后回「重启成功，用时xxx」，用户才感知得到重启完成；
  *   git/remote 缺失给中文引导；执行中防重入
  * 提示：本仓库已配置 origin（https://github.com/Temmie0125/mai-plugin.git）
  */
@@ -41,6 +43,45 @@ function shellPath(p) {
 async function git(cmd, { timeout = 120000 } = {}) {
   const { stdout, stderr } = await execAsync(cmd, { timeout, windowsHide: true, encoding: 'utf8' })
   return stdout + (stderr || '')
+}
+
+/**
+ * 宿主共享的重启模块（TRSS-Yunzai 自带 `plugins/other/restart.js`）
+ *
+ * 重启回执就出在这里：`Restart.set()` 动手前把发起人（群/好友/主人）与时刻写进
+ * redis `Yz:restart`，进程起来后由它注册的 `Bot.once("online")` 回一条
+ * 「重启成功，用时xxx」（就是手动 `#重启` 见到的那条）。裸 `Bot.restart()` 没有这一步
+ * ——过去更新完自动重启是静默的，用户不知道起没起来。
+ * 宿主没装该模块（非 TRSS 发行版）时返回 null，由调用方退回裸重启。
+ */
+export async function loadSharedRestart() {
+  try {
+    const mod = await import('../../other/restart.js')
+    return mod?.Restart ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 预约重启：延迟 2 秒动手，让「正在重启」回执先送达
+ *
+ * @param {object} e 当前事件 —— 共享 Restart 据此记「回执发给谁」
+ * @param {{load?: typeof loadSharedRestart, bot?: object, delay?: number}} [deps] 单测注入口
+ * @returns {Promise<boolean>} 宿主是否具备自动重启能力（false ⇒ 调用方回「请手动重启」）
+ */
+export async function scheduleRestart(e, { load = loadSharedRestart, bot = globalThis.Bot, delay = 2000 } = {}) {
+  const Restart = await load()
+  const bare = typeof bot?.restart === 'function' ? () => bot.restart() : null
+  if (!Restart && !bare) return false
+  setTimeout(async () => {
+    if (Restart) {
+      // 正常路径下这一句等不到 resolve（进程随即退出）；只有它**失败**（如 redis 写不进）才回落到裸重启
+      try { return await new Restart(e).restart() } catch { /* 落到下面 */ }
+    }
+    try { await bare?.() } catch { /* 吞掉：进程即将退出，回执已无意义 */ }
+  }, delay)
+  return true
 }
 
 export class MaiManage extends plugin {
@@ -218,7 +259,7 @@ export class MaiManage extends plugin {
     await this.autoSyncAssets()
     // 对齐 phi-plugin：新提交全带 √/✓ 标记则热更即可，否则自动重启宿主应用更新
     if (needRestart) {
-      if (this.restart()) {
+      if (await scheduleRestart(e)) {
         await this.reply('更新完毕，正在重启云崽以应用更新')
       } else {
         await this.reply('更新完毕。宿主不支持自动重启，请手动重启 Bot 生效。')
@@ -226,13 +267,6 @@ export class MaiManage extends plugin {
     } else {
       await this.reply('更新完毕，本次更新不需要进行重启')
     }
-    return true
-  }
-
-  /** 重启宿主 Bot（TRSS-Yunzai 的 Bot.restart 会先落盘 redis 再退出进程；2 秒缓冲让回执先送达） */
-  restart() {
-    if (!globalThis.Bot?.restart) return false
-    setTimeout(() => globalThis.Bot.restart(), 2000)
     return true
   }
 

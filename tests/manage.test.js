@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { MaiManage } from '../apps/manage.js'
+import { MaiManage, loadSharedRestart, scheduleRestart } from '../apps/manage.js'
 import Config from '../lib/config.js'
 
 function git(args, cwd) {
@@ -220,6 +220,54 @@ test('更新命令：非主人拒绝', async () => {
   const ret = await inst.update(e)
   assert.equal(ret, true)
   assert.match(replies.join(''), /仅主人可用/)
+})
+
+// ---- 自动重启（「重启成功，用时xxx」回执由宿主共享 Restart 类负责）----
+test('自动重启：优先共享 Restart（带重启回执），无共享模块退回裸 Bot.restart', async () => {
+  const wait = ms => new Promise(r => setTimeout(r, ms))
+  const e = { group_id: 987, user_id: 654, self_id: 321, reply: async () => {} }
+
+  // ① 共享模块可用 → 走它，且当前事件要原样传进去（回执据此知道发群还是发好友）
+  const seen = []
+  class FakeRestart {
+    constructor(ev) { seen.push(['ctor', ev]) }
+    async restart() { seen.push(['restart']) }
+  }
+  assert.equal(await scheduleRestart(e, { load: async () => FakeRestart, bot: null, delay: 1 }), true)
+  await wait(20)
+  assert.deepEqual(seen.map(s => s[0]), ['ctor', 'restart'])
+  assert.equal(seen[0][1], e, '事件要原样交给 Restart')
+
+  // ② 无共享模块 → 退回裸 Bot.restart（仍能重启，只是没有回执）
+  let botRestarts = 0
+  const bot = { restart: () => { botRestarts++ } }
+  assert.equal(await scheduleRestart(e, { load: async () => null, bot, delay: 1 }), true)
+  await wait(20)
+  assert.equal(botRestarts, 1)
+
+  // ③ 两条路都没有 → false（调用方据此改回「请手动重启 Bot 生效」）
+  assert.equal(await scheduleRestart(e, { load: async () => null, bot: undefined, delay: 1 }), false)
+
+  // ④ 共享类失败（如 redis 写不进）→ 不冒泡（定时器里抛错会打死宿主进程），且回落裸重启
+  let fallbackRestarts = 0
+  class Boom { async restart() { throw new Error('restart failed') } }
+  assert.equal(
+    await scheduleRestart(e, { load: async () => Boom, bot: { restart: () => { fallbackRestarts++ } }, delay: 1 }),
+    true,
+  )
+  await wait(20)
+  assert.equal(fallbackRestarts, 1)
+
+  // ⑤ 连回落也没有 → 静默吞掉（此时已无路可走，不能把宿主炸了）
+  assert.equal(await scheduleRestart(e, { load: async () => Boom, bot: undefined, delay: 1 }), true)
+  await wait(20)
+})
+
+test('loadSharedRestart：宿主没有该模块时不抛错（退回裸重启）', async () => {
+  // 单测环境里 `plugins/other/restart.js` 依赖宿主全局与宿主 config，通常加载不起来；
+  // 本用例只锁「不抛错」这一条契约——拿到类或 null 都算合格，抛错就是 bug
+  const Restart = await loadSharedRestart()
+  assert.ok(Restart === null || typeof Restart === 'function', `应为类或 null，实得 ${Restart}`)
 })
 
 test('gitErrText：中文分流（冲突/网络/未知）', () => {
