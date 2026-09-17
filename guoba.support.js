@@ -28,7 +28,11 @@ export function supportGuoba() {
     },
     configInfo: {
       schemas: [
-        { label: '命令与基础', component: 'SOFT_GROUP_BEGIN' },
+        { label: '系统设置', component: 'SOFT_GROUP_BEGIN' },
+        {
+          component: 'Divider',
+          label: '命令与基础'
+        },
         {
           field: 'cmdhead',
           label: '命令头',
@@ -54,7 +58,35 @@ export function supportGuoba() {
           bottomHelpMessage: '别名服务器走 cn 镜像（网络不佳时开启）',
           component: 'Switch',
         },
+        {
+          field: 'autoRecallAuthMsg',
+          label: '自动撤回授权消息',
+          bottomHelpMessage: '收到授权码后撤回 Bot 发的授权链接；绑定成功且 Bot 是群管理员时连授权码一起撤回。'
+            + '关闭后仍会提醒用户及时撤回（授权码不宜留在聊天里）',
+          component: 'Switch',
+        },
+        {
+          component: 'Divider',
+          label: '列表与分页'
+        },
+        {
+          field: 'helpMaxRows',
+          label: '列表单页行数',
+          component: 'InputNumber',
+          componentProps: { min: 10, max: 200 },
+        },
+        {
+          field: 'pageSize',
+          label: '分页大小',
+          bottomHelpMessage: '多候选选曲、投票列表等分页大小',
+          component: 'InputNumber',
+          componentProps: { min: 5, max: 50 },
+        },
         { label: '素材与渲染', component: 'SOFT_GROUP_BEGIN' },
+        {
+          component: 'Divider',
+          label: '素材设置'
+        },
         {
           field: 'saveInMemory',
           label: '素材内存化',
@@ -81,6 +113,10 @@ export function supportGuoba() {
           component: 'Input',
         },
         {
+          component: 'Divider',
+          label: '渲染设置'
+        },
+        {
           field: 'renderQuality',
           label: '截图质量',
           bottomHelpMessage: '截图 jpeg 质量',
@@ -94,7 +130,30 @@ export function supportGuoba() {
           component: 'InputNumber',
           componentProps: { min: 5000, max: 120000, addonAfter: 'ms' },
         },
-        { label: '水鱼查分器（Diving-Fish）', component: 'SOFT_GROUP_BEGIN' },
+        {
+          component: 'Divider',
+          label: '自动同步设置'
+        },
+        {
+          field: 'autoSync',
+          label: '每日自动同步曲库',
+          bottomHelpMessage: '关闭后仍可随时由主人用「#mai sync」手动同步；改动需重启生效',
+          component: 'Switch',
+        },
+        {
+          // 刻意用 Input 而非 TimePicker：TimePicker 的值类型是 Date/数组，与 yaml 里的 '05:30' 字符串
+          // 不一致，会静默写坏配置（本仓 schema 至今只用过 Input/Switch/InputNumber）
+          field: 'autoSyncTime',
+          label: '自动同步时间',
+          bottomHelpMessage: 'HH:MM（本地时区，如 05:30 或 5:30），改动需重启生效；'
+            + '默认 05:30 避开常见的 04:00–04:30 更新窗口，非法值会回退默认并告警',
+          component: 'Input',
+        },
+        { label: '查分器设置', component: 'SOFT_GROUP_BEGIN' },
+        {
+          component: 'Divider',
+          label: '水鱼查分器（Diving-Fish）'
+        },
         {
           field: 'proberProxy',
           label: '水鱼代理',
@@ -144,7 +203,10 @@ export function supportGuoba() {
             ],
           },
         },
-        { label: '落雪查分器（LXNS）', component: 'SOFT_GROUP_BEGIN' },
+        {
+          component: 'Divider',
+          label: '落雪查分器（LXNS）'
+        },
         {
           field: 'lxnsDevToken',
           label: '落雪开发者Token',
@@ -184,29 +246,11 @@ export function supportGuoba() {
           label: '落雪绑定仅私聊',
           component: 'Switch',
         },
-        { label: '绑定', component: 'SOFT_GROUP_BEGIN' },
+        { label: '娱乐功能', component: 'SOFT_GROUP_BEGIN' },
         {
-          field: 'autoRecallAuthMsg',
-          label: '自动撤回授权消息',
-          bottomHelpMessage: '收到授权码后撤回 Bot 发的授权链接；绑定成功且 Bot 是群管理员时连授权码一起撤回。'
-            + '关闭后仍会提醒用户及时撤回（授权码不宜留在聊天里）',
-          component: 'Switch',
+          component: 'Divider',
+          label: '猜歌'
         },
-        { label: '列表', component: 'SOFT_GROUP_BEGIN' },
-        {
-          field: 'helpMaxRows',
-          label: '列表单页行数',
-          component: 'InputNumber',
-          componentProps: { min: 10, max: 200 },
-        },
-        {
-          field: 'pageSize',
-          label: '分页大小',
-          bottomHelpMessage: '多候选选曲、投票列表等分页大小',
-          component: 'InputNumber',
-          componentProps: { min: 5, max: 50 },
-        },
-        { label: '猜歌', component: 'SOFT_GROUP_BEGIN' },
         {
           field: 'guessRoundInterval',
           label: '每轮提示间隔',
@@ -225,7 +269,10 @@ export function supportGuoba() {
           required: true,
           componentProps: { min: 5, max: 300, placeholder: '请输入时间', addonAfter: 's' },
         },
-        { label: '开字母', component: 'SOFT_GROUP_BEGIN' },
+        {
+          component: 'Divider',
+          label: '开字母设置'
+        },
         {
           field: 'letterSongCount',
           label: '每局曲目数',
@@ -265,22 +312,6 @@ export function supportGuoba() {
           component: 'InputNumber',
           required: true,
           componentProps: { min: 10, max: 3600, placeholder: '请输入时间', addonAfter: 's' },
-        },
-        { label: '定时', component: 'SOFT_GROUP_BEGIN' },
-        {
-          field: 'autoSync',
-          label: '每日自动同步曲库',
-          bottomHelpMessage: '关闭后仍可随时由主人用「#mai sync」手动同步；改动需重启生效',
-          component: 'Switch',
-        },
-        {
-          // 刻意用 Input 而非 TimePicker：TimePicker 的值类型是 Date/数组，与 yaml 里的 '05:30' 字符串
-          // 不一致，会静默写坏配置（本仓 schema 至今只用过 Input/Switch/InputNumber）
-          field: 'autoSyncTime',
-          label: '自动同步时间',
-          bottomHelpMessage: 'HH:MM（本地时区，如 05:30 或 5:30），改动需重启生效；'
-            + '默认 05:30 避开常见的 04:00–04:30 更新窗口，非法值会回退默认并告警',
-          component: 'Input',
         },
       ],
       // 读取/写回当前配置（键与 yaml 一一对应）；dfScope 转数组供多选框回显
