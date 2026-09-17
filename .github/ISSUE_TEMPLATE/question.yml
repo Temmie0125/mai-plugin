@@ -1,0 +1,67 @@
+name: ❓ 使用咨询
+description: 安装、配置、命令用法等疑问（非 Bug、非新功能）
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        使用上的疑问请先查阅 [README](https://github.com/Temmie0125/mai-plugin#readme)，多数安装、绑定与命令问题已有说明。
+        咨询时同样请提供环境信息，方便给出针对性的解答。
+
+        > 安全漏洞请勿在此公开发布，请通过 GitHub 的「Report a vulnerability」私密上报。
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题内容
+      description: 请尽量具体地描述想咨询的问题。
+      placeholder: 例如：bind fc 后查 B50 提示 404，需要怎么设置……
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: 相关命令 / 功能
+      description: 问题涉及的命令或功能，如 `#mai bind lxns`、猜歌、完成表等。
+  - type: dropdown
+    id: yunzai
+    attributes:
+      label: Yunzai 分支
+      options:
+        - TRSS-Yunzai（v3）
+        - miao-Yunzai（喵喵分支）
+        - Yunzai-Bot原版
+        - 其他 Yunzai 分支（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: node
+    attributes:
+      label: Node 版本
+      description: 在 Yunzai 根目录执行 `node -v` 获取。
+      options:
+        - Node 18.x
+        - Node 20.x
+        - Node 22.x
+        - Node 24.x
+        - 其他（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 运行环境
+      options:
+        - Windows
+        - Linux（Ubuntu / Debian 系）
+        - Linux（CentOS / 其他发行版）
+        - macOS
+        - Docker 容器
+        - Android（Termux）
+        - 其他（请在补充说明）
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 相关日志、截图或其他信息（「其他」选项的具体内容也请写在这里）。

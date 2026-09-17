@@ -1,0 +1,93 @@
+name: 💡 功能需求
+description: 提出新功能、新命令或对现有功能的改进建议
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提出想法！描述清楚**使用场景与期望形式**会让需求更容易被理解和实现。
+        若需求来自其他 maimai 查分插件（如 nonebot-plugin-maimaidx、phi-plugin），请附上参考链接或截图。
+
+        > 安全漏洞请勿在此公开发布，请通过 GitHub 的「Report a vulnerability」私密上报。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 使用场景 / 要解决的问题
+      description: 说明这个功能会在什么情况下用到、目前为什么满足不了。
+      placeholder: 例如：打完新版本想统计本版本盘数，目前只能手动翻完成表……
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 期望的功能形式
+      description: 描述理想中的命令、交互与输出形式，可附上命令示例。
+      placeholder: 例如：新增「#mai xxx」命令，出一张 xx 图，内容包含……
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: 参考资料
+      description: 其他插件的同类功能、原版 nonebot-plugin-maimaidx 的对应行为、相关接口文档等。
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案
+      description: 如果上面的形式不好实现，是否有可以接受的替代做法。
+  - type: dropdown
+    id: yunzai
+    attributes:
+      label: Yunzai 分支
+      description: 你当前使用的 Yunzai 分支，便于开发者在相近环境实现与测试。
+      options:
+        - TRSS-Yunzai（v3）
+        - miao-Yunzai（喵喵分支）
+        - Yunzai-Bot原版
+        - 其他 Yunzai 分支（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: node
+    attributes:
+      label: Node 版本
+      description: 在 Yunzai 根目录执行 `node -v` 获取。
+      options:
+        - Node 18.x
+        - Node 20.x
+        - Node 22.x
+        - Node 24.x
+        - 其他（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 运行环境
+      description: Bot 所部署的系统环境。
+      options:
+        - Windows
+        - Linux（Ubuntu / Debian 系）
+        - Linux（CentOS / 其他发行版）
+        - macOS
+        - Docker 容器
+        - Android（Termux）
+        - 其他（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: 参与意愿
+      description: 是否愿意协助推动这个需求落地。
+      options:
+        - 仅提需求，等开发者实现
+        - 愿意协助测试
+        - 愿意提交 PR
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 其他需要说明的信息（如「其他」选项的具体内容）。

@@ -1,0 +1,130 @@
+name: 🐞 Bug 反馈
+description: 插件功能异常、报错、出图错误等问题
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量完整填写以下信息，**环境信息（Yunzai 分支 / Node 版本 / 运行环境）是复现问题的关键**，缺失时可能无法定位。
+        标题请简明概括问题，例如：`#mai b50 报错 TypeError: xxx`。
+
+        > 安全漏洞请勿在此公开发布，请通过 GitHub 的「Report a vulnerability」私密上报。
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 简要说明遇到了什么问题、何时开始出现。
+      placeholder: 例如：发送 #mai b50 后 Bot 无响应 / 返回报错图 / 出图内容错误……
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请写出完整的触发命令与操作过程，便于按步骤复现。
+      placeholder: |
+        1. 发送「#mai xxx」
+        2. ……
+        3. 出现异常
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为与实际行为
+      description: 分别说明「应该是什么样」和「实际是什么样」。
+    validations:
+      required: true
+  - type: dropdown
+    id: yunzai
+    attributes:
+      label: Yunzai 分支
+      description: Bot 使用的 Yunzai 主体分支。
+      options:
+        - TRSS-Yunzai（v3）
+        - miao-Yunzai（喵喵分支）
+        - Yunzai-Bot原版
+        - 其他 Yunzai 分支（请在补充说明）
+    validations:
+      required: true
+  - type: input
+    id: yunzai-version
+    attributes:
+      label: Yunzai 版本
+      description: 查看Yunzai启动日志或者Yunzai根目录的package.json。
+      placeholder: 例如 3.1.3 / a1b2c3d
+  - type: dropdown
+    id: node
+    attributes:
+      label: Node 版本
+      description: 在 Yunzai 根目录执行 `node -v` 获取（本插件要求 Node ≥ 18）。
+      options:
+        - Node 18.x
+        - Node 20.x
+        - Node 22.x
+        - Node 24.x
+        - 其他（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 运行环境
+      description: Bot 所部署的系统环境。
+      options:
+        - Windows
+        - Linux（Ubuntu / Debian 系）
+        - Linux（CentOS / 其他发行版）
+        - macOS
+        - Docker 容器
+        - Android（Termux）
+        - 其他（请在补充说明）
+    validations:
+      required: true
+  - type: dropdown
+    id: adapter
+    attributes:
+      label: 协议适配
+      description: Bot 通过哪种协议接入 QQ，用于排查消息事件差异。
+      options:
+        - OneBot v11（icqq）
+        - OneBot v11（NapCat / Lagrange / LLOneBot 等实现）
+        - 官方 QQBot（openid）
+        - 不确定 / 与协议无关
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: 查分数据源
+      description: 问题涉及哪种绑定 / 数据源。
+      options:
+        - 落雪（bind lxns）
+        - 落雪（bind fc 好友码）
+        - 水鱼（Diving-Fish）
+        - 两者均配置
+        - 与查分无关（本地功能）
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      description: 启动日志中的 `[mai-plugin] vX.X.X 载入完成`，或查看插件目录下 package.json 的 version 字段。
+      placeholder: 例如 0.1.0
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志 / 报错信息
+      description: 请粘贴 Yunzai 控制台或 logs 目录中的相关报错（注意隐去 QQ 号、cookie、token 等隐私信息）。
+      render: bash
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 如报错图、返回图片渲染异常等，可直接粘贴截图。
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 其他需要说明的信息（如「其他」选项的具体内容、能否稳定复现等）。

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档
+    url: https://github.com/Temmie0125/mai-plugin#readme
+    about: 安装、配置、命令用法与常见说明，提问前请先查阅
