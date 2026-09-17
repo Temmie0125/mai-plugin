@@ -186,6 +186,112 @@ export function classifyDfBindError(error) {
   return DIVINGFISH_CODE_TEMPORARY_FAILED_MSG
 }
 
+// =====================================================================
+// 授权消息的撤回（水鱼/落雪通用）
+// =====================================================================
+
+/**
+ * 已发出的授权链接消息登记：用户键 → 链接消息在哪个会话、message_id 是多少
+ *
+ * 为什么自己记一份：宿主 setContext 存的是「发起绑定那一刻的事件」，拿不到 Bot 回复的
+ * message_id；而授权码多半从**另一个会话**发回来（群里拿链接、私聊发码），撤回时也得知道
+ * 链接当初发在哪个群/哪个好友那里。
+ */
+const authLinks = new Map()
+/** 登记有效期：比 20 分钟的等码会话略长，过期未收到码即作废 */
+const AUTH_LINK_TTL = 25 * 60 * 1000
+
+const authLinkKey = e => `${e.self_id ?? ''}:${e.user_id ?? ''}`
+
+/** 撤回一条授权链接消息（优先用当前会话的 group/friend，跨会话时走 pickGroup/pickFriend） */
+async function recallAuthLink(record, e) {
+  const sameGroup = record.groupId != null && String(record.groupId) === String(e?.group_id ?? '')
+  const sameFriend = record.groupId == null && !e?.isGroup && String(record.userId) === String(e?.user_id ?? '')
+  try {
+    if (sameGroup && e.group?.recallMsg) {
+      await e.group.recallMsg(record.messageId)
+      return true
+    }
+    if (sameFriend && e.friend?.recallMsg) {
+      await e.friend.recallMsg(record.messageId)
+      return true
+    }
+    const target = record.groupId != null
+      ? globalThis.Bot?.pickGroup?.(record.groupId)
+      : globalThis.Bot?.pickFriend?.(record.userId)
+    if (target?.recallMsg) {
+      await target.recallMsg(record.messageId)
+      return true
+    }
+  } catch { /* 超时（QQ 的自撤回窗口）/无权限：静默，改由文案提醒 */ }
+  return false
+}
+
+/**
+ * 记下刚发出的授权链接消息，供收到授权码后撤回
+ *
+ * 同一用户再发一次链接时，把上一轮的链接顺手撤掉——那串链接是一次性的，留着只是暴露面。
+ * 平台没回 message_id（部分适配器不返回）时不登记，功能自动降级成「只提醒」。
+ */
+export function rememberAuthLink(e, sent) {
+  const messageId = sent?.message_id
+  if (!messageId) return
+  const now = Date.now()
+  for (const [key, value] of authLinks) if (now - value.at > AUTH_LINK_TTL) authLinks.delete(key)
+  const prev = authLinks.get(authLinkKey(e))
+  if (prev) void recallAuthLink(prev, e)
+  authLinks.set(authLinkKey(e), {
+    groupId: e.group_id ?? null, userId: e.user_id ?? null, messageId, at: now,
+  })
+}
+
+/**
+ * 收码后的收尾说明（撤到什么程度就说什么；配置关闭时只提醒，不撤）
+ *
+ * `hadLink=false` 表示本轮没有登记过链接（直接用 `#mai bind <码>` 交码、或重启后登记已丢），
+ * 那种情况下不该提"授权链接"——用户手里根本没有这条消息。
+ * @param {{configured: boolean, hadLink?: boolean, linkRecalled?: boolean, codeRecalled?: boolean}} state
+ */
+export function authCleanupHint({ configured, hadLink = true, linkRecalled = false, codeRecalled = false }) {
+  const remindCode = '请及时撤回上面那条含授权码的消息'
+  if (!configured) {
+    return `※ 为保护账号安全，${remindCode}${hadLink ? '（授权链接也请一并撤回）' : ''}`
+  }
+  if (linkRecalled && codeRecalled) return '※ 已自动撤回授权链接与授权码消息'
+  if (codeRecalled) return `※ 已自动撤回授权码消息${hadLink ? '；授权链接未能撤回' : ''}`
+  if (linkRecalled) return `※ 已自动撤回授权链接；${remindCode}`
+  return `※ ${hadLink ? '授权链接与授权码消息都没能撤回，请及时手动撤回' : remindCode}`
+}
+
+/**
+ * 授权码到手后的现场清理（LXNS / 水鱼两条绑定路径共用，收码处调用一次）
+ *
+ * - 配置开启（默认）：撤回 Bot 发的那条授权链接消息
+ * - 绑定**成功**、且处于群聊、且 Bot 是群管理/群主时：连用户的授权码消息一起撤
+ *   （失败时留着——那条码可能还能重发，见各档失败文案里的「重新发送确认码」引导）
+ * - 撤不动（无权限/超窗口/非群聊/平台不支持）或配置关闭：回一句提醒由调用方附在回执末尾
+ *
+ * @returns {Promise<string>} 附在回执末尾的说明
+ */
+export async function settleAuthMessages(e, { success = false } = {}) {
+  const configured = Config.getUserCfg('config', 'autoRecallAuthMsg') !== false
+  const key = authLinkKey(e)
+  const record = authLinks.get(key)
+  authLinks.delete(key)
+
+  const linkRecalled = configured && record ? await recallAuthLink(record, e) : false
+  // 撤回他人的消息要群管理权限；私聊里 Bot 撤不了对方的消息（宿主同样不撤触发消息）
+  const canRecallCode = Boolean(e.isGroup && (e.group?.is_admin || e.group?.is_owner))
+  let codeRecalled = false
+  if (configured && success && canRecallCode && e.recall) {
+    try {
+      await e.recall()
+      codeRecalled = true
+    } catch { /* 落到提醒 */ }
+  }
+  return authCleanupHint({ configured, hadLink: Boolean(record), linkRecalled, codeRecalled })
+}
+
 const BIND_QQ_HELP = [
   `用法：#${H()} bind qq <你的QQ号>（解除：bind qq clear）`,
   '※ 官方QQBot 环境只有 openid、读不到 QQ 号；水鱼查分器按 QQ 代查需你主动提供一次，',
@@ -263,7 +369,7 @@ export class MaiBind extends plugin {
     }
     const text = ((e.msg.match(REG_BIND_LXNS()) || [])[1] || '').trim()
     if (!text) {
-      await this.reply(authorizeMsg(cfg), true)
+      rememberAuthLink(e, await this.reply(authorizeMsg(cfg), true))
       // 单一会话不变量：发起新绑定即作废水鱼等码会话（源 pending_bindings 每 (self_id, user_id) 仅一条）
       this.finish('waitDfCode')
       this.setContext('waitLxnsCode', false, 600, LXNS_TIMEOUT_MSG())
@@ -307,10 +413,10 @@ export class MaiBind extends plugin {
       const authorization = await bindDivingfish(got.user.qqid)
       // 单一会话不变量：发起新绑定即作废落雪等码会话（源 pending_bindings 每 (self_id, user_id) 仅一条）
       this.finish('waitLxnsCode')
-      await this.reply(divingfishAuthorizeMsg(cfg, {
+      rememberAuthLink(e, await this.reply(divingfishAuthorizeMsg(cfg, {
         ...authorization,
         binding_label: bindingLabel(got.user.qqid),
-      }), true)
+      }), true))
       this.setContext('waitDfCode', false, DIVINGFISH_SESSION_TTL, DIVINGFISH_TIMEOUT_MSG())
     } catch (error) {
       logger.warn(`[mai-plugin] 水鱼授权发起失败：${error?.name || error?.message}`)
@@ -407,10 +513,10 @@ export class MaiBind extends plugin {
     try {
       const result = await bindLxns(got.user, extractAuthorizationCode(text))
       this.finish('waitLxnsCode')
-      await this.reply(result, true)
+      await this.reply(`${result}\n${await settleAuthMessages(e, { success: true })}`, true)
     } catch (error) {
       logger.warn(`[mai-plugin] 落雪绑定失败：${error?.stack || error}`)
-      await this.reply(classifyBindError(error), true)
+      await this.reply(`${classifyBindError(error)}\n${await settleAuthMessages(e)}`, true)
       this.setContext('waitLxnsCode', false, 600, LXNS_TIMEOUT_MSG())
     }
     return true
@@ -433,10 +539,10 @@ export class MaiBind extends plugin {
     try {
       await completeDivingfishBinding(got.user.qqid, code)
       this.finish('waitDfCode')
-      await this.reply(DIVINGFISH_BIND_SUCCESS_MSG, true)
+      await this.reply(`${DIVINGFISH_BIND_SUCCESS_MSG}\n${await settleAuthMessages(e, { success: true })}`, true)
     } catch (error) {
       logger.warn(`[mai-plugin] 水鱼绑定失败：${error?.name || error?.message || error}`)
-      await this.reply(classifyDfBindError(error), true)
+      await this.reply(`${classifyDfBindError(error)}\n${await settleAuthMessages(e)}`, true)
       this.setContext('waitDfCode', false, DIVINGFISH_SESSION_TTL, DIVINGFISH_TIMEOUT_MSG())
     }
     return true

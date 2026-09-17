@@ -113,7 +113,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 首次启动自动从 `config/default_config/` 生成 `config/config/` 用户副本：
 
-- `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数、静态资源包地址与自动更新（`assetsRepo` / `autoUpdateAssets`）、每日自动同步（`autoSync` / `autoSyncTime`）等，修改后重启生效；
+- `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数、静态资源包地址与自动更新（`assetsRepo` / `autoUpdateAssets`）、绑定授权消息自动撤回（`autoRecallAuthMsg`，默认开启）、每日自动同步（`autoSync` / `autoSyncTime`）等，修改后重启生效；
 - `banGroup.yaml`：封禁群列表。
 
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。

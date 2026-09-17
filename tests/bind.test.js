@@ -4,6 +4,116 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
+// ---- 授权消息撤回（apps/bind.js：收码后清理授权链接/授权码）----
+test('authCleanupHint：撤到什么程度说什么，配置关闭只提醒', async () => {
+  const { authCleanupHint } = await import('../apps/bind.js')
+  assert.match(
+    authCleanupHint({ configured: true, linkRecalled: true, codeRecalled: true }),
+    /已自动撤回授权链接与授权码消息/,
+  )
+  assert.match(
+    authCleanupHint({ configured: true, linkRecalled: true, codeRecalled: false }),
+    /已自动撤回授权链接；请及时撤回上面那条含授权码的消息/,
+  )
+  assert.match(
+    authCleanupHint({ configured: true, linkRecalled: false, codeRecalled: true }),
+    /已自动撤回授权码消息；授权链接未能撤回/,
+  )
+  assert.match(
+    authCleanupHint({ configured: true, linkRecalled: false, codeRecalled: false }),
+    /都没能撤回，请及时手动撤回/,
+  )
+  // 配置关闭：不撤也要提醒（且文案里不出现"已自动撤回"）
+  const off = authCleanupHint({ configured: false, linkRecalled: true, codeRecalled: true })
+  assert.match(off, /请及时撤回上面那条含授权码的消息/)
+  assert.doesNotMatch(off, /已自动撤回/)
+  // 本轮没有链接可撤（直接 `#mai bind <码>` 交码、或重启后登记丢了）→ 不提"授权链接"
+  assert.equal(
+    authCleanupHint({ configured: true, hadLink: false, codeRecalled: true }),
+    '※ 已自动撤回授权码消息',
+  )
+  assert.match(
+    authCleanupHint({ configured: true, hadLink: false, codeRecalled: false }),
+    /^※ 请及时撤回上面那条含授权码的消息$/,
+  )
+  assert.doesNotMatch(authCleanupHint({ configured: false, hadLink: false }), /授权链接/)
+})
+
+test('settleAuthMessages：撤回链接；绑定成功且 Bot 是群管时才撤授权码', async () => {
+  const { rememberAuthLink, settleAuthMessages } = await import('../apps/bind.js')
+  const Config = (await import('../lib/config.js')).default
+  /** 只改 Config 内存缓存（多进程并行跑测试，写用户 yaml 会互相覆盖） */
+  const withCfg = async (patch, fn) => {
+    try {
+      Config.config.config = { ...Config.getConfig('config'), ...patch }
+      return await fn()
+    } finally {
+      delete Config.config.config
+    }
+  }
+  const makeE = ({ isAdmin = true } = {}) => {
+    const recalled = []
+    const e = {
+      self_id: '10000', user_id: '20000', group_id: '30000', isGroup: true,
+      group: { is_admin: isAdmin, is_owner: false, recallMsg: async id => recalled.push(id) },
+      recall: async () => recalled.push('code'),
+    }
+    return { e, recalled }
+  }
+
+  await withCfg({ autoRecallAuthMsg: true }, async () => {
+    // ① 群管 + 成功：链接与授权码都撤
+    const a = makeE({})
+    rememberAuthLink(a.e, { message_id: 'link-1' })
+    const hintA = await settleAuthMessages(a.e, { success: true })
+    assert.deepEqual(a.recalled, ['link-1', 'code'])
+    assert.match(hintA, /已自动撤回授权链接与授权码消息/)
+
+    // ② 非群管：撤不动授权码 → 提醒（链接照撤）
+    const b = makeE({ isAdmin: false })
+    rememberAuthLink(b.e, { message_id: 'link-2' })
+    const hintB = await settleAuthMessages(b.e, { success: true })
+    assert.deepEqual(b.recalled, ['link-2'], '无管理权限不得尝试撤回他人消息')
+    assert.match(hintB, /请及时撤回上面那条含授权码的消息/)
+
+    // ③ 绑定失败：授权码留着（可能还能重发），链接照撤
+    const c = makeE({})
+    rememberAuthLink(c.e, { message_id: 'link-3' })
+    const hintC = await settleAuthMessages(c.e, { success: false })
+    assert.deepEqual(c.recalled, ['link-3'])
+    assert.match(hintC, /请及时撤回上面那条含授权码的消息/)
+
+    // ④ 登记被消费：同一用户第二次收码不再重复撤，文案也不再提那条已经不存在的链接
+    const d = makeE({})
+    const hintD = await settleAuthMessages(d.e, { success: true })
+    assert.deepEqual(d.recalled, ['code'], '没有登记时只可能撤当前那条码消息')
+    assert.equal(hintD, '※ 已自动撤回授权码消息')
+  })
+
+  await withCfg({ autoRecallAuthMsg: false }, async () => {
+    const { e, recalled } = makeE({})
+    rememberAuthLink(e, { message_id: 'link-4' })
+    const hint = await settleAuthMessages(e, { success: true })
+    assert.deepEqual(recalled, [], '配置关闭：一条都不撤')
+    assert.match(hint, /请及时撤回上面那条含授权码的消息/)
+  })
+})
+
+test('rememberAuthLink：无 message_id 不登记；再发一次链接时旧链接顺手撤回', async () => {
+  const { rememberAuthLink } = await import('../apps/bind.js')
+  const recalled = []
+  const e = {
+    self_id: '1', user_id: '2', group_id: '3', isGroup: true,
+    group: { is_admin: true, recallMsg: async id => recalled.push(id) },
+  }
+  rememberAuthLink(e, {})                      // 平台没回 message_id（部分适配器如此）
+  rememberAuthLink(e, { message_id: 'first' })
+  await new Promise(r => setTimeout(r, 10))
+  rememberAuthLink(e, { message_id: 'second' })  // 旧的应立即被撤
+  await new Promise(r => setTimeout(r, 10))
+  assert.deepEqual(recalled, ['first'])
+})
+
 // ---- 落雪 OAuth 纯函数（lib/lxnsOauth.js）----
 test('lxnsOauth：授权码三形态提取 + 拒收', async () => {
   const { extractAuthorizationCode } = await import('../lib/lxnsOauth.js')

@@ -184,6 +184,14 @@ export function supportGuoba() {
           label: '落雪绑定仅私聊',
           component: 'Switch',
         },
+        { label: '绑定', component: 'SOFT_GROUP_BEGIN' },
+        {
+          field: 'autoRecallAuthMsg',
+          label: '自动撤回授权消息',
+          bottomHelpMessage: '收到授权码后撤回 Bot 发的授权链接；绑定成功且 Bot 是群管理员时连授权码一起撤回。'
+            + '关闭后仍会提醒用户及时撤回（授权码不宜留在聊天里）',
+          component: 'Switch',
+        },
         { label: '列表', component: 'SOFT_GROUP_BEGIN' },
         {
           field: 'helpMaxRows',
