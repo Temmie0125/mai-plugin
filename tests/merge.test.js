@@ -385,6 +385,25 @@ test('别名合并（柚子 + LXNS >1000 加 10000 + 本地，去重保序）', 
   assert.ok(merged.root.every((a, i) => i === 0 || merged.root[i - 1].song_id <= a.song_id))
 })
 
+test('回归：别名合并 LXNS 宴谱 id（≥100000）不再偏移（源 bc19b45 修复）', () => {
+  const merged = mergeAliasData({
+    yuzuAliases: [],
+    lxnsAliases: {
+      aliases: [
+        { song_id: 100001, aliases: ['宴谱别名'] },
+        { song_id: 99999, aliases: ['DX别名'] },
+        { song_id: 1000, aliases: ['边界 SD'] },
+        { song_id: 1001, aliases: ['边界 DX'] },
+      ],
+    },
+  })
+  assert.equal(merged.byId(100001)[0].alias[0], '宴谱别名', '宴谱 ≥100000 原样保留（曾错偏成 110001）')
+  assert.deepEqual(merged.byId(110001), [], '不得存在错误偏移出的 110001')
+  assert.equal(merged.byId(109999)[0].alias[0], 'DX别名', '<100000 仍偏移 +10000')
+  assert.equal(merged.byId(1000)[0].alias[0], '边界 SD', '边界值 1000 不偏移')
+  assert.equal(merged.byId(11001)[0].alias[0], '边界 DX', '边界值 1001 偏移为 11001')
+})
+
 test('成绩转换：DF/LXNS → PlayedResult / Best50', () => {
   // DF 单曲（dev/player/record 响应形态）
   const dfRecord = [{ song_id: 8, title: 'True Love Song', level: '7', level_index: 1, achievements: 99.1234, fc: 'ap', fs: 'fs', rate: 'sss', dxScore: 200, ra: 180, ds: 7.0, type: 'SD', level_label: '7' }]
