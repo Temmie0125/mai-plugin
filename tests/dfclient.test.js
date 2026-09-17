@@ -36,6 +36,7 @@ function stubFetch(route) {
     return {
       status: r.status ?? 200,
       ok: (r.status ?? 200) < 400,
+      url: u,                       // 真实 fetch 的 Response 带 url；_handleError 靠它区分 403 来源
       json: async () => r.body ?? {},
       text: async () => JSON.stringify(r.body ?? {}),
     }
@@ -171,4 +172,30 @@ test('lxnsFormatResult：已带 10000 偏移的 id 不再二次偏移（旧快�
     '已是 10001+ 的 id 视为已还原，保持原值')
   assert.equal(lxnsFormatResult({ id: 1451, type: 'standard', achievements: 100 }).song_id, 1451,
     '标准谱不加偏移')
+})
+
+// =====================================================================
+// 403 分源：公开查询 vs 代用户端点（真机反馈：绑定好好的却被报「尚未授权」）
+// =====================================================================
+
+test('403 映射：oauth 用户的 B50（公开 /query/player）不再被误报成「尚未授权」', async () => {
+  const { DivingFishUserDisabledQueryError, DivingFishNotAuthorizedError } =
+    await import('../lib/client/errors.js')
+
+  // ① oauth 用户的 B50 走公开端点（不带凭据），用户没开「允许他人查询」→ 403
+  stubFetch(() => ({ status: 403, body: { message: 'user not allow to query' } }))
+  const api = new DivingFishAPI(114518)
+  api.oauth = true // 强制走 oauth 分支（不依赖本机是否配了 df 凭据，CI 同款）
+  await assert.rejects(() => api.queryUserB50(), DivingFishUserDisabledQueryError,
+    '公开端点 403 应说「该用户禁止了其他人获取数据」，而不是冤枉绑定')
+
+  // ② 代用户端点（/player/*）403 才是真的没授权
+  stubFetch(u => (u.includes('/oauth/token')
+    ? { body: { access_token: 'TK', expires_in: 300 } }
+    : { status: 403, body: { message: 'forbidden' } }))
+  await assert.rejects(() => new DivingFishAPI(114519).queryUserRecords(), DivingFishNotAuthorizedError)
+
+  // ③ 非 oauth（开发者 token 路线）403 仍是「用户禁止他人查询」，与源一致
+  stubFetch(() => ({ status: 403, body: {} }))
+  await assert.rejects(() => new DivingFishAPI(null, 'someone').queryUserB50(), DivingFishUserDisabledQueryError)
 })

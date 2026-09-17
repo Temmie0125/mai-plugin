@@ -35,6 +35,23 @@ test('落雪 403：隐私三选项在前、BOT 侧令牌排查在后', async () 
   )
 })
 
+test('水鱼未授权文案：回填配置的 Bot 名，未配置才回落「本 BOT」', async () => {
+  const { NOTAUTHORIZED } = await import('../lib/handlerError.js')
+  const Config = (await import('../lib/config.js')).default
+  // 只改 Config 的内存缓存，不写用户 yaml（多进程并行跑测试，写盘会互相覆盖）
+  const patch = async value => {
+    try {
+      Config.config.config = { ...Config.getConfig('config'), botName: value }
+      return NOTAUTHORIZED()
+    } finally {
+      delete Config.config.config
+    }
+  }
+  assert.match(await patch(''), /您尚未授权「本 BOT」访问您的水鱼查分器成绩/, '未配置时保持旧文案')
+  assert.match(await patch('舞萌测试'), /您尚未授权「舞萌测试 BOT」访问您的水鱼查分器成绩/)
+  assert.match(await patch('舞萌测试'), /请发送「#mai bind df」/)
+})
+
 test('既有映射不受影响：错误类别仍各归其位', async () => {
   const { errorMessage, NOTFOUNDUSER, NOTAUTHORIZED } = await import('../lib/handlerError.js')
   const {

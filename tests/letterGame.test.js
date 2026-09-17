@@ -150,20 +150,24 @@ test('开局：板面全是遮罩（空格保留），对局已登记', () => {
 })
 
 test('open：成功翻开 / 重复字母 / 不含该字母 三分支', async () => {
-  const sent = []
-  const game = startExact([SONGS[0], SONGS[1], SONGS[2], SONGS[3]], { send: m => sent.push(m) })
-  const today = game.rows.find(r => r.song.song_name === 'Today')
-  assert.ok(today, '候选定死后 Today 必在局中')
+  // 冷却必须钉死：本用例连开两次字母，冷却 >0 时第二次会先判 cooldown 而不是 dup。
+  // 读的是用户 config（服务器上 letterRevealCd=30 之类的设置会让本用例随环境时红时绿）
+  return await withCfg({ letterRevealCd: 0, letterGuessCd: 0, letterTipCd: 0 }, async () => {
+    const sent = []
+    const game = startExact([SONGS[0], SONGS[1], SONGS[2], SONGS[3]], { send: m => sent.push(m) })
+    const today = game.rows.find(r => r.song.song_name === 'Today')
+    assert.ok(today, '候选定死后 Today 必在局中')
 
-  assert.equal((await g.openLetter(111, 'T')).kind, 'opened', 'Today 含 T')
-  assert.equal(mark(today.blur), 'T****')
-  assert.equal((await g.openLetter(111, 'T')).kind, 'dup', '同一字母不重复开')
-  // 用 Q 当「谁都不含」的样例：注意 Z 会命中 ジ（其多首字母 jz 同时收 ji/zi），不是 miss
-  assert.equal((await g.openLetter(111, 'q')).kind, 'miss', '没有行含 Q')
+    assert.equal((await g.openLetter(111, 'T')).kind, 'opened', 'Today 含 T')
+    assert.equal(mark(today.blur), 'T****')
+    assert.equal((await g.openLetter(111, 'T')).kind, 'dup', '同一字母不重复开')
+    // 用 Q 当「谁都不含」的样例：注意 Z 会命中 ジ（其多首字母 jz 同时收 ji/zi），不是 miss
+    assert.equal((await g.openLetter(111, 'q')).kind, 'miss', '没有行含 Q')
 
-  assert.ok(sent.some(m => m.includes('成功翻开字母[ T ]')))
-  assert.ok(sent.some(m => m.includes('已经翻开过')))
-  assert.ok(sent.some(m => m.includes('这几首曲目中不包含字母[ q ]')))
+    assert.ok(sent.some(m => m.includes('成功翻开字母[ T ]')))
+    assert.ok(sent.some(m => m.includes('已经翻开过')))
+    assert.ok(sent.some(m => m.includes('这几首曲目中不包含字母[ q ]')))
+  })
 })
 
 test('open：汉字按拼音、假名按罗马字（这是相对 phi 的净增）', async () => {
