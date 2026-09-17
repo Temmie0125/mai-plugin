@@ -3,7 +3,10 @@
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  * 迁移自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）。
  * - 落雪：OAuth 授权码流 → 授权 URL 回复 → setContext('waitLxnsCode') 用户级拦截（600s，宿主兜底超时）
- * - 水鱼：服务端 on-behalf（device_authorization → 链接即完成，无轮询）；不落本地凭据
+ * - 水鱼：服务端 on-behalf + 确认码回填（handoff=code → 授权页给码 → 用户发回 → redeem 兑换），
+ *   等码会话经 setContext('waitDfCode')（20min = 授权链接 10min + 确认码 10min，源 DIVINGFISH_SESSION_TTL）；
+ *   不落本地凭据；单一会话不变量：任一侧发起新绑定即 finish 对方上下文（源 pending_bindings 每
+ *   (self_id, user_id) 仅一条的语义——落雪授权码正则恰好能匹配水鱼码，两家居上下文会互相抢码）
  * - bind 落凭据；落雪绑定完成自动切到落雪源（源无此行为，本移植优化）；其余切换 #mai source
  * - 绑定失败按源两档文案分类（LXNS 六错误类 → 「授权码可能已使用/过期」；其余 → 「暂时失败」），
  *   显式 instanceof 名单（JS ApiError 单根无法按根分类），不进 handlerError 查询文案表
@@ -12,14 +15,15 @@ import plugin from '../../../lib/plugins/plugin.js'
 import Config, { head } from '../lib/config.js'
 import * as database from '../lib/database.js'
 import { getUserAndAuth, effectiveService } from '../lib/user.js'
-import { bindLxns, bindDivingfish, bindFriendCode, DF_QQ_HINT } from '../lib/handler.js'
+import { bindLxns, bindDivingfish, completeDivingfishBinding, bindFriendCode, DF_QQ_HINT } from '../lib/handler.js'
 import { botName } from '../lib/render/picmodle.js'
 import {
   buildAuthorizeUrl, extractAuthorizationCode, isBindingChannelAllowed,
 } from '../lib/lxnsOauth.js'
-import { bindingLabel, REVOKE_URL } from '../lib/client/divingfishOauth.js'
+import { bindingLabel, extractConfirmationCode, REVOKE_URL } from '../lib/client/divingfishOauth.js'
 import { serviceDisplay, serviceNameByIndex, serviceHelp, themeNameByIndex, themeHelp } from '../lib/merge/models.js'
 import {
+  DivingFishBindingMismatchError, DivingFishConfirmationCodeError,
   LXNSNotFoundError, LXNSOAuthError, LXNSParamsError,
   LXNSPermissionDeniedError, LXNSTokenError, LXNSTooManyRequestsError,
 } from '../lib/client/errors.js'
@@ -146,6 +150,42 @@ export function classifyBindFcError(error) {
 const DIVINGFISH_OAUTH_ERROR = 'BOT管理员尚未配置水鱼查分器 OAuth 应用，无法进行绑定授权。'
 const DIVINGFISH_BIND_FAILED_MSG = '发起水鱼授权失败：水鱼账号服务可能暂时不可用，请稍后再试。'
 
+/** 水鱼绑定指令展示名（文案内指路统一走它；实际两种写法都可触发） */
+const DF_BIND_CMD = () => `#${H()} bind df`
+
+/** 等码会话时长（源 DIVINGFISH_SESSION_TTL = 20min：授权链接 10min + 确认码 10min） */
+const DIVINGFISH_SESSION_TTL = 20 * 60
+const DIVINGFISH_TIMEOUT_MSG = () => `水鱼授权会话已超时，请重新发送「${DF_BIND_CMD()}」获取授权链接`
+const DIVINGFISH_NO_SESSION_MSG = () => `请先发送「${DF_BIND_CMD()}」获取授权链接，完成授权后再发送确认码。`
+const DIVINGFISH_INVALID_CODE_MSG = [
+  '未识别到有效的水鱼确认码。',
+  '请发送授权完成页面显示的完整确认码，形如 BCDF-GHJK-LMNP。',
+].join('\n')
+const DIVINGFISH_CODE_FAILED_MSG = [
+  '水鱼绑定失败：确认码可能已使用、已过期，或不是本次绑定的确认码。',
+  `当前绑定会话仍有效，您可以发送新的确认码；如需重新授权，请再次发送「${DF_BIND_CMD()}」。`,
+].join('\n')
+const DIVINGFISH_MISMATCH_MSG = [
+  '水鱼绑定失败：这串确认码对应的授权不属于您的账号。',
+  '确认码只能由发起绑定的本人使用，请勿使用他人转发给您的确认码。',
+  `如需绑定自己的账号，请发送「${DF_BIND_CMD()}」重新走一遍授权。`,
+].join('\n')
+const DIVINGFISH_BIND_SUCCESS_MSG = '水鱼查分器授权完成，现在可以直接使用查询指令了。'
+const DIVINGFISH_CODE_TEMPORARY_FAILED_MSG = [
+  '水鱼绑定暂时失败：水鱼账号服务或网络出现异常。',
+  `当前绑定会话仍有效，您可以稍后重新发送确认码；如果确认码已经使用，请再次发送「${DF_BIND_CMD()}」重新授权。`,
+].join('\n')
+
+/**
+ * 水鱼绑定失败分档（源 complete_divingfish except 分支）；导出供单测锁值。
+ * Mismatch（码有效但不是发给这个 QQ 的）照实说清，别让用户以为是自己操作错了。
+ */
+export function classifyDfBindError(error) {
+  if (error instanceof DivingFishBindingMismatchError) return DIVINGFISH_MISMATCH_MSG
+  if (error instanceof DivingFishConfirmationCodeError) return DIVINGFISH_CODE_FAILED_MSG
+  return DIVINGFISH_CODE_TEMPORARY_FAILED_MSG
+}
+
 const BIND_QQ_HELP = [
   `用法：#${H()} bind qq <你的QQ号>（解除：bind qq clear）`,
   '※ 官方QQBot 环境只有 openid、读不到 QQ 号；水鱼查分器按 QQ 代查需你主动提供一次，',
@@ -159,7 +199,8 @@ const UNBIND_HELP = [
   '・qq：解除「bind qq」补充的游戏 QQ（官方QQBot 水鱼将重新受限）',
 ].join('\n')
 
-function divingfishAuthorizeMsg(cfg, authorization) {
+/** 水鱼授权文案（源 DIVINGFISH_AUTHORIZE_MSG：回填确认码版，3 步；导出供单测锁值） */
+export function divingfishAuthorizeMsg(cfg, authorization) {
   return [
     '请完成水鱼查分器授权：',
     '',
@@ -168,10 +209,13 @@ function divingfishAuthorizeMsg(cfg, authorization) {
     authorization.verification_uri_complete,
     '=======================',
     `2. 确认页面显示的绑定身份为「${authorization.binding_label}」后点击「同意授权」`,
+    '3. 复制页面给出的确认码，回到 QQ 发送给 BOT',
     '',
-    `链接 ${Math.max(Math.floor(authorization.expires_in / 60), 1)} 分钟内有效，授权完成后直接使用查询指令即可，无需回复授权码。`,
+    `本次绑定 ${Math.max(Math.floor(authorization.expires_in / 60), 1)} 分钟内有效，确认码只能使用一次；`,
+    `超时或失效后请重新发送「${DF_BIND_CMD()}」。`,
     '=======================',
-    '请注意！！这条链接仅供您本人使用，请勿转发他人。',
+    '请注意！！链接与确认码都仅供您本人使用，请勿转发他人。',
+    '确认码建议在与 BOT 的私聊中发送，避免被他人看到。',
     `如需取消授权，请前往 ${(cfg.dfAuthUrl || 'https://auth.diving-fish.com').replace(/\/+$/, '')}${REVOKE_URL}`,
   ].join('\n')
 }
@@ -220,18 +264,37 @@ export class MaiBind extends plugin {
     const text = ((e.msg.match(REG_BIND_LXNS()) || [])[1] || '').trim()
     if (!text) {
       await this.reply(authorizeMsg(cfg), true)
+      // 单一会话不变量：发起新绑定即作废水鱼等码会话（源 pending_bindings 每 (self_id, user_id) 仅一条）
+      this.finish('waitDfCode')
       this.setContext('waitLxnsCode', false, 600, LXNS_TIMEOUT_MSG())
       return true
     }
     return await this.completeBinding(e, text)
   }
 
-  /** #mai bind df（服务端授权，无轮询、不落库） */
+  /**
+   * #mai bind df：无参=发起授权+挂起等码会话；带参=直接用确认码完成绑定
+   * （源 df_bind / df_bind_code 语义：先会话后验码——没有会话时即使消息像码也回
+   * NO_SESSION，防止把别人转发来的码烧掉）
+   */
   async bindDfCmd(e) {
     const cfg = Config.getUserCfg('config')
     if (!(cfg.dfClientId && cfg.dfClientSecret)) {
       await this.reply(DIVINGFISH_OAUTH_ERROR, true)
       return true
+    }
+    const text = ((e.msg.match(REG_BIND_DF()) || [])[1] || '').trim()
+    if (text) {
+      if (!this.getContext('waitDfCode')) {
+        await this.reply(DIVINGFISH_NO_SESSION_MSG(), true)
+        return true
+      }
+      const code = extractConfirmationCode(text)
+      if (!code) {
+        await this.reply(DIVINGFISH_INVALID_CODE_MSG, true)
+        return true
+      }
+      return await this.completeDfBinding(e, code)
     }
     const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
     if (!got) return true
@@ -242,10 +305,13 @@ export class MaiBind extends plugin {
     }
     try {
       const authorization = await bindDivingfish(got.user.qqid)
+      // 单一会话不变量：发起新绑定即作废落雪等码会话（源 pending_bindings 每 (self_id, user_id) 仅一条）
+      this.finish('waitLxnsCode')
       await this.reply(divingfishAuthorizeMsg(cfg, {
         ...authorization,
         binding_label: bindingLabel(got.user.qqid),
       }), true)
+      this.setContext('waitDfCode', false, DIVINGFISH_SESSION_TTL, DIVINGFISH_TIMEOUT_MSG())
     } catch (error) {
       logger.warn(`[mai-plugin] 水鱼授权发起失败：${error?.name || error?.message}`)
       await this.reply(DIVINGFISH_BIND_FAILED_MSG, true)
@@ -336,6 +402,8 @@ export class MaiBind extends plugin {
   async completeBinding(e, text) {
     const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
     if (!got) return true
+    // 单一会话不变量：落雪绑定动作取代水鱼等码会话（源 pending_bindings 语义）
+    this.finish('waitDfCode')
     try {
       const result = await bindLxns(got.user, extractAuthorizationCode(text))
       this.finish('waitLxnsCode')
@@ -346,6 +414,44 @@ export class MaiBind extends plugin {
       this.setContext('waitLxnsCode', false, 600, LXNS_TIMEOUT_MSG())
     }
     return true
+  }
+
+  /**
+   * 确认码完成水鱼绑定（命令内联 / waitDfCode 上下文两路共用，源 df_bind_code 语义）
+   * 成功即结束会话；失败按分档文案回复并保持/重挂会话（码未被消费可重发）
+   */
+  async completeDfBinding(e, code) {
+    const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
+    if (!got) return true
+    // 单一会话不变量：水鱼绑定动作取代落雪等码会话
+    this.finish('waitLxnsCode')
+    if (!Number.isInteger(got.user.qqid) || got.user.qqid <= 0) {
+      this.finish('waitDfCode')
+      await this.reply(DF_QQ_HINT(), true)
+      return true
+    }
+    try {
+      await completeDivingfishBinding(got.user.qqid, code)
+      this.finish('waitDfCode')
+      await this.reply(DIVINGFISH_BIND_SUCCESS_MSG, true)
+    } catch (error) {
+      logger.warn(`[mai-plugin] 水鱼绑定失败：${error?.name || error?.message || error}`)
+      await this.reply(classifyDfBindError(error), true)
+      this.setContext('waitDfCode', false, DIVINGFISH_SESSION_TTL, DIVINGFISH_TIMEOUT_MSG())
+    }
+    return true
+  }
+
+  /**
+   * waitDfCode 上下文路由（源 df_bind_code 裸消息匹配器语义）
+   * - 非确认码消息 → 'continue' 放行（等码期间正常聊天/指令不受影响）
+   * - 命中确认码 → 完成绑定
+   */
+  async waitDfCode() {
+    const e = this.e
+    const code = extractConfirmationCode(e.msg || '')
+    if (!code) return 'continue'
+    return await this.completeDfBinding(e, code)
   }
 
   /**

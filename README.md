@@ -119,7 +119,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。
 
 > [!NOTE]
-> 使用水鱼 OAuth 绑定时，用户发送 `#mai bind df`，BOT 会返回一条授权链接，用户打开并确认页面上显示的绑定身份后点击「同意授权」即可，**不需要把授权码回贴给 BOT**。绑定关系与授权范围保存在水鱼服务端，BOT只保管应用凭据，不保存任何用户令牌；用户可随时在 https://auth.diving-fish.com/apps 撤销授权。未绑定的用户仍可使用 `#mai b50` 指令。
+> 使用水鱼 OAuth 绑定时，用户发送 `#mai bind df`，BOT 会返回一条授权链接：打开链接并登录水鱼账号，确认页面上显示的绑定身份后点击「同意授权」，再把**页面给出的确认码发回给 BOT**，绑定即告完成。确认码形如 `BCDF-GHJK-LMNP`，只能使用一次，且只能由发起绑定的本人回填——这一步确认「点同意的人」和「发起绑定的人」是同一个人，请勿使用或转发他人发来的确认码。绑定关系与授权范围保存在水鱼服务端，BOT只保管应用凭据，不保存任何用户令牌；用户可随时在 https://auth.diving-fish.com/apps 撤销授权。未绑定的用户仍可使用 `#mai b50` 指令。
 
 > [!WARNING]
 > 开发者 token 已被水鱼查分器弃用：它能按 QQ 号读取任意用户的成绩，用户从未对 BOT 做过授权，也无法撤销。水鱼已停止签发新的开发者 token，并将在过渡期后关闭该鉴权方式。请申请 OAuth 应用并配置 `dfClientId` 与 `dfClientSecret`。

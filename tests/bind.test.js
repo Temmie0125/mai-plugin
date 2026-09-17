@@ -55,6 +55,52 @@ test('divingfishOauth：subjectRef/bindingLabel/TokenCache', async () => {
   assert.equal(cache.get('ref'), null)
 })
 
+// ---- 水鱼确认码提取（源 extract_confirmation_code；bc19b45 前的 a841433 引入）----
+test('divingfishOauth：确认码提取（容错 + 拒收）', async () => {
+  const { extractConfirmationCode } = await import('../lib/client/divingfishOauth.js')
+  // 标准形态 XXXX-XXXX-XXXX
+  assert.equal(extractConfirmationCode('BCDF-GHJK-LMNP'), 'BCDF-GHJK-LMNP')
+  // 小写 / 连字符丢失 / 空格 / 全角破折号 / 下划线
+  assert.equal(extractConfirmationCode('bcdf-ghjk-lmnp'), 'BCDF-GHJK-LMNP')
+  assert.equal(extractConfirmationCode('BCDFGHJKLMNP'), 'BCDF-GHJK-LMNP')
+  assert.equal(extractConfirmationCode('BCDF GHJK LMNP'), 'BCDF-GHJK-LMNP')
+  assert.equal(extractConfirmationCode('BCDF—GHJK—LMNP'), 'BCDF-GHJK-LMNP')
+  assert.equal(extractConfirmationCode('BCDF_GHJK_LMNP'), 'BCDF-GHJK-LMNP')
+  // 「确认码/授权码」前缀（半/全角冒号、带不带空格）
+  assert.equal(extractConfirmationCode('确认码：BCDF-GHJK-LMNP'), 'BCDF-GHJK-LMNP')
+  assert.equal(extractConfirmationCode('授权码:BCDFGHJKLMNP'), 'BCDF-GHJK-LMNP')
+  assert.equal(extractConfirmationCode('  确认码 BCDF-GHJK-LMNP  '), 'BCDF-GHJK-LMNP')
+  // 拒收：字母表外的字符（元音 AEIOU、数字 0/1；L 在字母表内——源示例码 BCDF-GHJK-LMNP 本身就含 L）
+  assert.equal(extractConfirmationCode('ABCDE-GHJK-LMNP'), null)
+  assert.equal(extractConfirmationCode('BCDF-GHIK-LMNP'), null, '含 I 应拒收')
+  assert.equal(extractConfirmationCode('BCDF-GHJK-0MNP'), null, '含 0 应拒收')
+  assert.equal(extractConfirmationCode('BCDF-GHJK-LMN1'), null, '含 1 应拒收')
+  assert.equal(extractConfirmationCode('BCDF-GHJK-LLNP'), 'BCDF-GHJK-LLNP', 'L 合法')
+  // 拒收：长度不对 / 夹在句子里
+  assert.equal(extractConfirmationCode('BCDF-GHJK-LMN'), null)
+  assert.equal(extractConfirmationCode('BCDF-GHJK-LMNPP'), null)
+  assert.equal(extractConfirmationCode('我的码是 BCDFGHJKLMNP 请查收'), null, '不从句子中抠码')
+  assert.equal(extractConfirmationCode('随便聊聊'), null)
+})
+
+test('divingfishOauth：tokenSubject 只解不验 / resolveDfScope 兜底', async () => {
+  const { tokenSubject, resolveDfScope, DEFAULT_DF_SCOPE } = await import('../lib/client/divingfishOauth.js')
+  const b64u = obj => Buffer.from(JSON.stringify(obj)).toString('base64url')
+  const jwt = [b64u({ alg: 'none' }), b64u({ sub: 'df-114514', exp: 1 }), 'sig'].join('.')
+  assert.equal(tokenSubject(jwt), 'df-114514')
+  assert.equal(tokenSubject([b64u({ alg: 'none' }), b64u({ exp: 1 }), 'sig'].join('.')), null, '无 sub → null')
+  assert.equal(tokenSubject('not-a-jwt'), null)
+  assert.equal(tokenSubject(null), null)
+
+  // scope：缺省回退 / 字符串 / 数组（Guoba 多选写回）/ 未知项回退
+  assert.equal(DEFAULT_DF_SCOPE, 'prober.records.read')
+  assert.equal(resolveDfScope(undefined), DEFAULT_DF_SCOPE)
+  assert.equal(resolveDfScope(''), DEFAULT_DF_SCOPE)
+  assert.equal(resolveDfScope('prober.records.read  prober.profile.read'), 'prober.records.read prober.profile.read')
+  assert.equal(resolveDfScope(['profile', 'email']), 'profile email')
+  assert.equal(resolveDfScope('prober.records.read typo-scope'), DEFAULT_DF_SCOPE, '未知权限名回退默认')
+})
+
 // ---- service/theme 索引辅助（merge/models.js）----
 test('models：source/theme 索引映射与帮助文本', async () => {
   const { serviceNameByIndex, serviceHelp, themeNameByIndex, themeHelp } =
@@ -124,6 +170,44 @@ test('落雪授权文案：隐私设置三选项齐全（绑定期就提醒，�
   for (const opt of ['允许读取玩家信息', '允许读取谱面成绩', '允许读取历史成绩']) {
     assert.ok(text.includes(opt), `授权文案缺少选项：${opt}`)
   }
+})
+
+// ---- 水鱼确认码绑定（a841433 同步）----
+test('水鱼授权文案：确认码三步走，不再「无需回复授权码」', async () => {
+  const { divingfishAuthorizeMsg } = await import('../apps/bind.js')
+  const text = divingfishAuthorizeMsg(
+    { dfAuthUrl: '' },
+    { verification_uri_complete: 'https://auth.diving-fish.com/oauth?k=v', expires_in: 600, binding_label: 'QQ 11**14' },
+  )
+  assert.match(text, /auth\.diving-fish\.com\/oauth\?k=v/, '应包含授权链接')
+  assert.match(text, /「QQ 11\*\*14」/, '应展示绑定身份')
+  assert.match(text, /3\. 复制页面给出的确认码，回到 QQ 发送给 BOT/, '第三步为回填确认码')
+  assert.match(text, /本次绑定 10 分钟内有效，确认码只能使用一次/, '有效期按分钟取整')
+  assert.ok(!text.includes('无需回复授权码'), '旧流程「无需回复授权码」文案必须移除')
+  assert.match(text, /请勿转发他人/, '防转发提示保留')
+  assert.match(text, /auth\.diving-fish\.com\/apps/, '撤销页保留')
+  // expires_in 不足一分钟也要显示 1 分钟
+  const short = divingfishAuthorizeMsg({ dfAuthUrl: '' }, { verification_uri_complete: 'u', expires_in: 30, binding_label: 'QQ 1' })
+  assert.match(short, /本次绑定 1 分钟内有效/)
+})
+
+test('classifyDfBindError：三档映射（源 complete_divingfish except 分支）', async () => {
+  const { classifyDfBindError } = await import('../apps/bind.js')
+  const { DivingFishBindingMismatchError, DivingFishConfirmationCodeError } =
+    await import('../lib/client/errors.js')
+  assert.match(classifyDfBindError(new DivingFishBindingMismatchError()), /不属于您的账号/)
+  assert.match(classifyDfBindError(new DivingFishConfirmationCodeError()), /确认码可能已使用、已过期/)
+  assert.match(classifyDfBindError(new Error('网络异常')), /暂时失败/)
+})
+
+test('waitDfCode 上下文：非确认码消息放行（不触碰数据库）', async () => {
+  const { MaiBind } = await import('../apps/bind.js')
+  const inst = new MaiBind()
+  // 宿主上下文范式：方法无参，当前消息经 Object.assign(new cls(e), { e }) 注入 this.e
+  const run = msg => inst.waitDfCode(Object.assign(inst, { e: { msg } }))
+  assert.equal(await run('随便聊聊'), 'continue')
+  assert.equal(await run('#mai b50'), 'continue', '等码期间正常指令不受影响')
+  assert.equal(await run('AB12-CD34-EF56'), 'continue', '落雪形态授权码不是水鱼码')
 })
 
 // ---- rank 文本纯函数（lib/handler.js）----
