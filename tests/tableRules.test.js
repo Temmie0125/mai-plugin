@@ -95,12 +95,13 @@ test('定数表守卫：无参数给出引导', async () => {
   assert.match(replies[0], /请输入定数/)
 })
 
-test('规则表顺序：plateinfo → 定数表 → 定数完成表 → 版本完成表 → 等级进度 → 分数列表 → 关键词列表', () => {
+test('规则表顺序：plateinfo → 定数表 → 定数完成表 → 版本完成表 → 等级进度 → 分数列表 → 关键词列表 → plate兜底', () => {
   // ⚠️ 声明序即匹配序（宿主首中先服务）。末尾两条是「理论/新歌/旧版本」的关键词形态
-  //    （数字形态仍归 levelScoreList，两者互斥；见《b50扩展实现设计.md》§8.2）
+  //    （数字形态仍归 levelScoreList，两者互斥；见《b50扩展实现设计.md》§8.2），
+  //    plateFallback 必须垫底，只接住前面规则全都不要的 plate 输入
   assert.deepEqual(rules.map(r => r.fnc),
     ['plateInfo', 'ratingTable', 'ratingPlate', 'versionPlate', 'levelProgress', 'levelScoreList',
-      'levelScoreListKey', 'levelScoreListKey'])
+      'levelScoreListKey', 'levelScoreListKey', 'plateFallback'])
 })
 
 // =====================================================================
@@ -140,6 +141,54 @@ test('版本完成表守卫：真将 → 真系没有真将哦。', async () => 
   replies.length = 0
   await inst.versionPlate({ msg: '#mai plate 真将' })
   assert.deepEqual(replies, ['真系没有真将哦。'])
+})
+
+// =====================================================================
+// plate 兜底（不存在的牌子等无效输入 → 明确报错，不再静默）
+// =====================================================================
+
+test('plate 兜底规则：接住无效输入，且不抢任何具体规则的活', () => {
+  const reg = rules.find(r => r.fnc === 'plateFallback').reg
+  for (const msg of [
+    '#mai plate 超天将',   // 版本字对、称号不存在（原静默案例）
+    '#mai plate 天将',     // 版本字就不存在
+    '#mai plate',          // 缺参数
+    '#mai plate 13 fc 2',  // 定数形带多余参数
+    '#mai plate 13+fc',    // 粘连写法（缺空格）
+  ]) {
+    assert.match(msg, reg, `兜底应命中：${msg}`)
+  }
+  // 首中先服务：合法输入的第一个命中规则必须是具体规则，兜底不得抢先
+  for (const msg of [
+    '#mai plate 13', '#mai plate 13 fc', '#mai plate 真极', '#mai plate 真极 进度',
+    '#mai plate 真极完成表 2', '#mai plateinfo', '/mai plate 舞舞舞完成表',
+  ]) {
+    const first = rules.find(r => r.reg.test(msg))
+    assert.ok(first, `${msg} 应命中某条规则`)
+    assert.notEqual(first.fnc, 'plateFallback', `${msg} 不应落到兜底`)
+  }
+  // 兜底自身不得误吃 plateinfo（无空格粘连）
+  assert.doesNotMatch('#mai plateinfo', reg, '不应命中：#mai plateinfo')
+})
+
+test('plate 兜底文案：分路报错（不存在的牌子 / 缺参 / 定数形 / 真将守卫）', async () => {
+  const { inst, replies } = makeInst(MaiTable)
+  const cases = [
+    ['#mai plate 超天将', /没有「超天将」这个牌子/],
+    ['#mai plate 天将', /没有「天将」这个牌子/],
+    // PLATE_CN 简转繁后再提示（晓 → 暁）
+    ['#mai plate 晓天将', /没有「晓天将」这个牌子[\s\S]*「暁」后可接称号/],
+    ['#mai plate', /请输入要查询的牌子或定数/],
+    ['#mai plate 13 fc 2', /无法识别的定数完成表「13 fc 2」/],
+    // 版本字+称号都合法但带了尾参；「真将」类交回 parseVersionPlate 的守卫文案
+    ['#mai plate 真将 xyz', /真系没有真将哦。/],
+    ['#mai plate 超将 xyz', /没有「超将 xyz」这个牌子/],
+  ]
+  for (const [msg, want] of cases) {
+    replies.length = 0
+    await inst.plateFallback({ msg })
+    assert.match(replies[0], want, `${msg} 文案`)
+  }
 })
 
 test('版本完成表守卫：PLATE_CN 归一后再判真将（晓将 ≠ 真将）', async () => {

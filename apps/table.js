@@ -104,6 +104,16 @@ const REG_VERSION_PLATE_SAY = () => new RegExp(
 )
 
 /**
+ * plate 兜底：凡 `#mai plate …` 未被上面任一具体规则接住的输入（如「超天将」、粘连的
+ * 「13+fc」、光秃秃的 plate），到此明确报错——否则整条命令静默放行，用户会以为 Bot 无响应。
+ * 具体规则在前（宿主首中先服务），能落到这里的都是真实无效输入，不会误伤合法查询。
+ */
+const REG_PLATE_FALLBACK = () => new RegExp(`^[#/]${H()}\\s*plate(?:\\s+(.+))?\\s*$`)
+
+/** 兜底报错里的称号提示串：極/极/将/神/者/舞舞/大将 */
+const PLAN_HINT = `${PLAN_CHARS.split('').join('/')}/舞舞/大将`
+
+/**
  * 版本称号完成表参数归一（`#mai plate` 子命令与口语「真极完成表」共用，防两条路径漂移）
  * 源 mai_table.py:122 顺序：PLATE_CN 简繁归一 → 真将守卫
  * 「大将」（评级 ≥ SSS+ 的完成表，b50扩展设计 V6）与 極/极/将/神/者/舞舞 同处这一参数位。
@@ -126,6 +136,7 @@ export function parseVersionPlate(ver, plan, kindRaw, pageRaw) {
  * 表格族命令类
  * ⚠️ rule 声明序即匹配序（宿主首中先服务）：**数字在前的定数完成表必须排在版本称号完成表之前**，
  * 靠「数字」与「版本字」互斥天然消歧；plateinfo 无空格，与 `plate\s+…` 本就不冲突。
+ * 末尾的 plate 兜底垫底：只接住前面规则全都不收的 plate 输入并报错，杜绝静默无响应。
  */
 export class MaiTable extends plugin {
   constructor() {
@@ -144,6 +155,8 @@ export class MaiTable extends plugin {
         // 关键词形态的列表（理论/新歌/旧版本）：两条规则共用一个执行体
         { reg: REG_LIST_KEY().source, fnc: 'levelScoreListKey' },
         { reg: REG_LIST_KEY_SAY().source, fnc: 'levelScoreListKey' },
+        // plate 兜底必须垫底：先给具体规则让路，只接住它们全都不要的 plate 输入
+        { reg: REG_PLATE_FALLBACK().source, fnc: 'plateFallback' },
       ],
     })
   }
@@ -342,6 +355,44 @@ export class MaiTable extends plugin {
       ? await drawPlateProgress(got.user, parsed.ver, parsed.plan, parsed.page)
       : await drawPlateTable(got.user, parsed.ver, parsed.plan, parsed.page)
     await this.reply(toSegment(payload), true)
+    return true
+  }
+
+  /**
+   * plate 兜底报错：「#mai plate 超天将」等未被任何具体规则接住的输入，按形状分路给文案，
+   * 不再静默。能进来的输入四类：① 缺参 ② 数字开头（定数完成表形状不对）③ 版本字不认识
+   * ④ 版本字对但称号不对/尾参多余（含「真将」类，复用 parseVersionPlate 的守卫文案）。
+   */
+  async plateFallback(e) {
+    if (!(await ensureReady(e))) return true
+    const m = (e.msg || '').match(REG_PLATE_FALLBACK()) || []
+    const raw = (m[1] || '').trim()
+    if (!raw) {
+      await this.reply(`请输入要查询的牌子或定数，例如「#${H()} plate 镜将」「#${H()} plate 13 fc」。`, true)
+      return true
+    }
+    const token = raw.split(/\s+/)[0]
+    if (/^[0-9]/.test(token)) {
+      await this.reply(`无法识别的定数完成表「${raw}」。请输入 7-15 的定数，可加 fc/ap，例如「#${H()} plate 13 fc」。`, true)
+      return true
+    }
+    const v = PLATE_CN[token[0]] || token[0]
+    if (!VERSION_CHARS.includes(v)) {
+      await this.reply(`没有「${raw}」这个牌子哦。牌子以版本字开头，后接称号：${PLAN_HINT}，例如「#${H()} plate 镜将」。`, true)
+      return true
+    }
+    const plan = token.slice(1)
+    if (![...PLAN_CHARS, '舞舞', '大将'].includes(plan)) {
+      await this.reply(`没有「${raw}」这个牌子哦。「${v}」后可接称号：${PLAN_HINT}，例如「#${H()} plate ${v}将」。`, true)
+      return true
+    }
+    // 版本字与称号都合法却落到这里：只剩「真将」类禁牌与多余/拼错的尾参，交回真将守卫分流
+    const parsed = parseVersionPlate(v, plan, null, null)
+    if (parsed.error) {
+      await this.reply(parsed.error, true)
+      return true
+    }
+    await this.reply(`没有「${raw}」这个牌子哦，请检查参数，例如「#${H()} plate ${v}${plan}」或「#${H()} plate ${v}${plan}完成表」。`, true)
     return true
   }
 }
