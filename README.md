@@ -44,7 +44,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #   给了达成率或评级即为**纯模拟**（不再看你的实际成绩，没打过的曲也能出图）；
 #   DX 分数必须带 dx 前缀（dx1145 / dx99%），星数写 N星。缺省：理论 → FDX+/5星/AP+，其余 → FDX/3星/FC+
 #mai song <曲名|ID> / search <关键词> / what <词>
-#   检索语法：search 定数14+ / 定数14-15 / bpm200-300（区间用 - 或 ~，尾部数字为页码）
+#   检索语法：search 定数14+ / 定数14-15 / bpm200-300 / 物量300-500（区间用 - 或 ~，尾部数字为页码）
 #mai fsline [难度色]<曲名|ID|别名> [达成率]
 #   分数线成图（四张表全由物量推出）；难度色与曲名顺序可互换，达成率可省略
 #mai table <定数> / plate <条件或版本称号> / plateinfo / progress / list
@@ -54,6 +54,7 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #   bind fc：只绑好友码（免 OAuth）——可查 B50 / AP50 / 单曲；不带参数时按 QQ 自动解析；绑定即切到落雪
 #   拟合b50、随心配、完成表等**全量成绩**功能需要「bind lxns」授权（开发者接口只给不含达成率的简化成绩）
 #mai guess / guessill / letter（开字母）/ fortune（今日舞萌）/ rand / rise / com|calc|计算 <定数> <达成率>
+#   rand 定数支持字面/小数/区间：rand 13 / rand 14.9 / rand 13-14（口语「随个」同）
 #   游戏进行中：开 <一个字符> 翻开所有该字符 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
 #   com|calc|计算：单曲 Rating 计算器（免绑定），如 #mai calc 13.6 100.5
 #mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票

@@ -119,6 +119,22 @@ test('parseSongQuery：粘连前缀 / 空格 / 来源标记 / 页码保留', asy
   assert.ok(parseSongQuery('bpm200-300').result.length > 0)
   assert.equal(parseSongQuery('bpm 200 3').page, 3)
   assert.ok(parseSongQuery('bpm200 x').error)
+  // 物量（谱面 note 总数，整数；语法同 bpm）。单值/区间取自曲库真实物量，避免字面量绑死数据
+  const notesVal = mai.totalList.root
+    .flatMap(s => s.difficulties.map(d => d.notes?.total ?? 0))
+    .find(n => n >= 200)
+  assert.ok(notesVal >= 200, '曲库应含带物量数据的谱面')
+  assert.ok(parseSongQuery(`物量${notesVal}`).result.length > 0, '物量单值应命中含该物量谱面的曲')
+  assert.ok(parseSongQuery(`物量${notesVal - 100}-${notesVal + 100}`).result.length > 0, '物量区间应命中')
+  assert.equal(
+    parseSongQuery(`物量${notesVal - 100}～${notesVal + 100}`).result.length,
+    parseSongQuery(`物量${notesVal - 100}-${notesVal + 100}`).result.length,
+    '全角连接符等价',
+  )
+  assert.equal(parseSongQuery('物量 300 2').page, 2, '尾部数字为页码')
+  assert.ok(parseSongQuery('物量300 x').error)
+  assert.ok(parseSongQuery('物量300.5').error, '物量只收整数')
+  assert.ok(parseSongQuery('物量300-').error)
   // 命中别名表的曲名走别名通道（本库 'ネコ日和。' 自身即别名行）；非别名标题走 title
   assert.equal(parseSongQuery('アンビバレンス').source, 'alias')
   assert.equal(parseSongQuery('11365').source, 'id')

@@ -3,12 +3,13 @@
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  * - song：精确直查 → 曲目详情卡（1 命中）；多条结果自动降级为列表（≤5 文本 / >5 分页图）
  * - search：检索列表语义（对齐 phi-plugin `#phi search` 心智）——跳过详情卡分支，一律列表
- *   两者共享 parseSongQuery：曲名/别名/ID + 定数|bpm|曲师|谱师 前缀过滤
+ *   两者共享 parseSongQuery：曲名/别名/ID + 定数|物量|bpm|曲师|谱师 前缀过滤
  *   谱师前缀先过别名表归一到曲库原名（哈皮 → はっぴー，resources/info/designer_alias.json，
  *   与「<谱师>50」变体同源）——曲库存的是原名，中文叫法直接比对必然落空
  *   数值语法：`定数14`/`定数14.5`、等级字面 `定数14+`（游戏内 14.6+ 显示「14+」）、
  *   区间必须显式连接符 `定数14-15`/`定数14~15`（含全角 ～/－）、尾部数字为页码；
- *   无连接符的双数字 = 单值 + 页码（如 `定数14 4`，防区间误判）；bpm 语法同构
+ *   无连接符的双数字 = 单值 + 页码（如 `定数14 4`，防区间误判）；bpm/物量 语法同构
+ *   （物量 = 谱面 note 总数，整数；命中任一难度即在列，语义同定数过滤）
  * - what / 「XX是什么歌」：本地别名 → 柚子投票态 → id → 标题链（口语正则保留，priority 1500）
  */
 import plugin from '../../../lib/plugins/plugin.js'
@@ -46,7 +47,7 @@ const isFloat = v => !Number.isNaN(parseFloat(v))
  */
 export function parseSongQuery(rawArgs) {
   const raw = String(rawArgs).trim()
-  const lead = raw.match(/^(定数|bpm|曲师|谱师)\s*(.+)$/i)
+  const lead = raw.match(/^(定数|物量|bpm|曲师|谱师)\s*(.+)$/i)
   const tokens = raw.split(/\s+/).filter(Boolean)
 
   let cmd = null
@@ -146,6 +147,30 @@ export function parseSongQuery(rawArgs) {
     }
   }
 
+  // 物量：谱面 note 总数（本仓扩展，源无此过滤）；语法同 bpm，只收整数
+  if (cmd === '物量') {
+    const s = rest.join(' ')
+    const range = s.match(/^(\d+)\s*[-~～－]\s*(\d+)(?:\s+(\d+))?$/)
+    if (range) {
+      const [a, b] = [parseInt(range[1], 10), parseInt(range[2], 10)].sort((x, y) => x - y)
+      if (range[3]) page = parseInt(range[3], 10)
+      return { result: mai.totalList.filter({ notes: [a, b] }), page, source: 'filter' }
+    }
+    const single = s.match(/^(\d+)(?:\s+(\d+))?$/)
+    if (single) {
+      if (single[2]) page = parseInt(single[2], 10)
+      return { result: mai.totalList.filter({ notes: parseInt(single[1], 10) }), page, source: 'filter' }
+    }
+    return {
+      error: [
+        '物量查歌参数错误，页数为可选：',
+        '物量查歌「物量」「页数」（如 物量300、物量300 3）',
+        '物量查歌「最小物量-最大物量」「页数」（连接符 - 或 ~，如 物量300-500、物量300~400 2）',
+        '',
+      ].join('\n'),
+    }
+  }
+
   // 曲师 / 谱师
   if (!rest.length) {
     return {
@@ -222,7 +247,7 @@ export class MaiSong extends plugin {
     const args = ((e.msg.match(reg) || [])[1] || '').trim()
     if (!args) {
       await this.reply(
-        forceList ? '请输入检索关键词（曲名/别名/定数/bpm/曲师/谱师）' : '没有找到这样的乐曲。\n※ 如果是别名请使用「XXX是什么歌」指令进行查询哦。',
+        forceList ? '请输入检索关键词（曲名/别名/定数/物量/bpm/曲师/谱师）' : '没有找到这样的乐曲。\n※ 如果是别名请使用「XXX是什么歌」指令进行查询哦。',
         true,
       )
       return true

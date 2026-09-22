@@ -19,10 +19,14 @@ import { pyFloat } from '../lib/render/textwidth.js'
 
 const H = () => head()
 
-/** 源 `^[随来给]个((?:dx|sd|标准))?([绿黄红紫白]?)([0-9]+\+?).*`（re.IGNORECASE）
- *  规则字符串带不了 flags，故 dx/sd 显式写大小写两态，判型时再统一 toLowerCase */
-const REG_RAND_SAY = () => /^[随来给]个([Dd][Xx]|[Ss][Dd]|标准)?([绿黄红紫白]?)([0-9]+\+?).*/
-/** 收编后的子命令形态（设计 §3.2-11）：`#mai rand dx紫14` / `#mai 随机 白13` */
+/** 源 `^[随来给]个((?:dx|sd|标准))?([绿黄红紫白]?)([0-9]+\+?).`（re.IGNORECASE）
+ *  规则字符串带不了 flags，故 dx/sd 显式写大小写两态，判型时再统一 toLowerCase。
+ *  定数段扩为本仓语法（区间|小数|字面，区间优先保证最长捕获）；源末尾的强制通配 `.`
+ *  会把末位数字吃给尾段（`随个13` 解析成定数 1、`随个14.9` 解析成 14），改为 `.*`
+ *  让定数整体捕获——这是修正，不是照搬。 */
+const REG_RAND_SAY = () => /^[随来给]个([Dd][Xx]|[Ss][Dd]|标准)?([绿黄红紫白]?)(\d+(?:\.\d+)?\s*[-~～－]\s*\d+(?:\.\d+)?|\d+\.\d+|\d+\+?).*/
+/** 收编后的子命令形态（设计 §3.2-11）：`#mai rand dx紫14` / `#mai 随机 白13`；
+ *  定数段支持字面（13/13+）、小数精确（14.9）与区间（13-14）三态 */
 const REG_RAND = () => new RegExp(`^[#/]${H()}\\s*(?:rand|随机)(?:\\s+(.+))?$`)
 /** 源 `on_command("今日舞萌")`；收编后补英文子命令 fortune 与 phi 系的 jrrp */
 const REG_FORTUNE = () => new RegExp(`^[#/]${H()}\\s*(?:fortune|jrrp|今日舞萌)\\s*$`)
@@ -42,11 +46,18 @@ const RAND_COLORS = '绿黄红紫白'
  * 不给任何条件即「全曲库随机」（phi 同命令无参时 `top=100, bottom=0`，等价语义）。
  * 口语形态仍要求定数（`来个` 这种两字头太容易误触发）。
  *
+ * 定数段三态（本仓扩展，检索族 `定数13-14` 同一口径）：
+ * - `13` / `13+`：等级字面（源语义，按 level 归组）
+ * - `14.9`：定数值精确（level_value）
+ * - `13-14` / `13.5~15`：定数值区间（连接符 -/~，含全角 ～/－，两侧空格可选）
+ * 纯整数不写连接符永不误判为区间——`13 14` 整段不合法，回用法提示。
+ *
  * @param {string} raw 用户输入的条件串（空串/纯空白 ⇒ 全默认值）
  * @returns {{types: string[], color: string, level: string} | null} 含无法识别字符时 null
  */
 export function parseRandArgs(raw) {
-  const m = (raw || '').trim().toLowerCase().match(/^(dx|sd|标准)?([绿黄红紫白])?([0-9]+\+?)?$/)
+  const m = (raw || '').trim().toLowerCase()
+    .match(/^(dx|sd|标准)?([绿黄红紫白])?(\d+(?:\.\d+)?\s*[-~～－]\s*\d+(?:\.\d+)?|\d+\.\d+|\d+\+?)?$/)
   if (!m) return null
   const [, type, color = '', level = ''] = m
   const types = type === 'dx' ? ['DX'] : (type === 'sd' || type === '标准') ? ['SD'] : ['SD', 'DX']
@@ -54,20 +65,36 @@ export function parseRandArgs(raw) {
 }
 
 /**
- * 按条件筛曲（源 `mai_base.py:369-377`）：先按类型/定数 filter，再按颜色位次核对该难度定数
+ * 按条件筛曲（源 `mai_base.py:369-377` + 本仓定数三态）：先按类型/定数 filter，再按颜色位次核对该难度定数
  * @returns {any[] | null} 命中的曲目（保留全部难度，与源 `filter(all_diff=True)` 一致）；条件不可解析时 null
  */
 export function filterRandSongs(raw) {
   const parsed = parseRandArgs(raw)
   if (!parsed) return null
   const { types, color, level } = parsed
+  // 定数三态：区间 → level_value 区间（端点排序，与检索族 `定数13-14` 同口径）；
+  // 小数 → level_value 精确；纯整数（13/13+）→ 等级字面（源语义）
+  const range = level ? level.match(/^(\d+(?:\.\d+)?)\s*[-~～－]\s*(\d+(?:\.\d+)?)$/) : null
+  const bounds = range
+    ? [parseFloat(range[1]), parseFloat(range[2])].sort((a, b) => a - b)
+    : null
+  const exact = !range && level && level.includes('.') ? parseFloat(level) : null
+  const byLevel = range
+    ? { level_value: bounds }
+    : exact != null ? { level_value: exact } : level ? { level } : null
   // 定数省略即不限，故 filter 只带类型；全空时 filter({type:['SD','DX']}) 等价全曲库
-  let songs = mai.totalList.filter(level ? { level, type: types } : { type: types })
+  let songs = mai.totalList.filter(byLevel ? { ...byLevel, type: types } : { type: types })
   if (color) {
     const ci = RAND_COLORS.indexOf(color)
     // 颜色本是定数的限定词；没有定数时退化为「该难度位次存在」的过滤
-    songs = songs.filter(s => s.difficulties.length > ci
-      && (!level || s.difficulties[ci].level === level))
+    songs = songs.filter(s => {
+      if (s.difficulties.length <= ci) return false
+      if (!level) return true
+      const d = s.difficulties[ci]
+      if (bounds) return bounds[0] <= d.level_value && d.level_value <= bounds[1]
+      if (exact != null) return d.level_value === exact
+      return d.level === level
+    })
   }
   return songs
 }
@@ -184,7 +211,8 @@ export class MaiRand extends plugin {
     if (!songs) {
       await this.reply(
         `随机谱面用法：#${H()} rand [dx|sd][绿黄红紫白][定数]\n`
-        + `例：#${H()} rand（全曲库随机）、#${H()} rand dx紫14、#${H()} rand 13、#${H()} rand 白13+`,
+        + `例：#${H()} rand（全曲库随机）、#${H()} rand dx紫14、#${H()} rand 13、#${H()} rand 白13+、`
+        + `#${H()} rand 14.9、#${H()} rand 13-14`,
         true,
       )
       return true
