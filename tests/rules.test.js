@@ -132,6 +132,13 @@ test('parseSongQuery：粘连前缀 / 空格 / 来源标记 / 页码保留', asy
     '全角连接符等价',
   )
   assert.equal(parseSongQuery('物量 300 2').page, 2, '尾部数字为页码')
+  // all_diff=false 对齐谱师过滤：difficulties 裁剪到命中项（列表彩标只点亮命中的难度格）
+  const noteHits = parseSongQuery(`物量${notesVal - 100}-${notesVal + 100}`).result
+  assert.ok(
+    noteHits.every(s => s.difficulties.length > 0
+      && s.difficulties.every(d => d.notes.total >= notesVal - 100 && d.notes.total <= notesVal + 100)),
+    '物量结果的 difficulties 应只剩命中区间的谱面',
+  )
   assert.ok(parseSongQuery('物量300 x').error)
   assert.ok(parseSongQuery('物量300.5').error, '物量只收整数')
   assert.ok(parseSongQuery('物量300-').error)

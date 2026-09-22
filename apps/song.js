@@ -9,7 +9,8 @@
  *   数值语法：`定数14`/`定数14.5`、等级字面 `定数14+`（游戏内 14.6+ 显示「14+」）、
  *   区间必须显式连接符 `定数14-15`/`定数14~15`（含全角 ～/－）、尾部数字为页码；
  *   无连接符的双数字 = 单值 + 页码（如 `定数14 4`，防区间误判）；bpm/物量 语法同构
- *   （物量 = 谱面 note 总数，整数；命中任一难度即在列，语义同定数过滤）
+ *   （物量 = 谱面 note 总数，整数；命中难度即整曲在列，但 difficulties 裁剪到命中项——
+ *   列表彩标只点亮命中物量的难度，对齐谱师过滤的 all_diff=false 语义）
  * - what / 「XX是什么歌」：本地别名 → 柚子投票态 → id → 标题链（口语正则保留，priority 1500）
  */
 import plugin from '../../../lib/plugins/plugin.js'
@@ -147,19 +148,20 @@ export function parseSongQuery(rawArgs) {
     }
   }
 
-  // 物量：谱面 note 总数（本仓扩展，源无此过滤）；语法同 bpm，只收整数
+  // 物量：谱面 note 总数（本仓扩展，源无此过滤）；语法同 bpm，只收整数。
+  // all_diff=false 对齐谱师过滤：只保留命中物量的难度——列表彩标只点亮符合条件的那几格
   if (cmd === '物量') {
     const s = rest.join(' ')
     const range = s.match(/^(\d+)\s*[-~～－]\s*(\d+)(?:\s+(\d+))?$/)
     if (range) {
       const [a, b] = [parseInt(range[1], 10), parseInt(range[2], 10)].sort((x, y) => x - y)
       if (range[3]) page = parseInt(range[3], 10)
-      return { result: mai.totalList.filter({ notes: [a, b] }), page, source: 'filter' }
+      return { result: mai.totalList.filter({ notes: [a, b], all_diff: false }), page, source: 'filter' }
     }
     const single = s.match(/^(\d+)(?:\s+(\d+))?$/)
     if (single) {
       if (single[2]) page = parseInt(single[2], 10)
-      return { result: mai.totalList.filter({ notes: parseInt(single[1], 10) }), page, source: 'filter' }
+      return { result: mai.totalList.filter({ notes: parseInt(single[1], 10), all_diff: false }), page, source: 'filter' }
     }
     return {
       error: [
