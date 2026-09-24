@@ -39,7 +39,7 @@
     }
     .header .ver { font-family: 'mai-torus', 'mai-rounded', sans-serif; font-size: 20px; color: rgba(0,0,0,0.35); }
 
-    /* ===== 紧凑三列：每列独立堆叠（masonry 式），无行对齐断档 ===== */
+    /* ===== 单列堆叠：组卡片纵向依次排列，增删命令免分列维护（随心配 B50 页同款） ===== */
     .grid { display: flex; gap: 22px; align-items: stretch; }
     .col {
       flex: 1; min-width: 0;
@@ -58,27 +58,34 @@
       background: #ffe3ec; color: #ff5f8f;
     }
 
-    /* 组内表格行：指令 | 示例·说明 */
+    /* 组内表格行：左=命令(第一行)+参数(第二行) | 右=描述(第一行)+示例(第二行)，逐行对齐 */
     .row { display: flex; gap: 14px; padding: 7px 2px; border-bottom: 1px dashed rgba(0,0,0,0.08); }
     .row:last-child { border-bottom: none; }
     .row .cmd {
-      flex: 0 0 44%;
+      flex: 0 0 320px;
       font-family: 'mai-torus', 'mai-rounded', monospace;
-      font-size: 21px; color: #2a9db8; line-height: 1.35;
+      color: #2a9db8;
     }
+    .row .cmd .name { font-size: 21px; line-height: 25px; }
+    .row .cmd .params { font-size: 17px; line-height: 24px; margin-top: 2px; color: rgba(42,157,184,0.55); }
     .row .info { flex: 1; }
-    .row .info .desc { font-size: 18px; color: #555; line-height: 1.4; }
+    /* .desc 与 .cmd .name 行高归一（25px），保证左右第二行（eg / params）顶部对齐 */
+    .row .info .desc { font-size: 18px; color: #555; line-height: 25px; }
     .row .info .eg {
       font-family: 'mai-torus', 'mai-rounded', monospace;
-      font-size: 17px; color: rgba(0,0,0,0.38);
+      font-size: 17px; line-height: 24px; color: rgba(0,0,0,0.38);
     }
 
-    /* ===== 参数说明卡（第三列底部） ===== */
+    /* ===== 参数说明卡（单列底部通栏，内部多列排布） ===== */
     .sidecard .group { background: #dff1ff; color: #3a8fd4; }
     .kv { padding: 6px 2px; border-bottom: 1px dashed rgba(0,0,0,0.08); font-size: 19px; }
     .kv:last-child { border-bottom: none; }
     .kv b { color: #3a8fd4; font-weight: normal; margin-right: 8px; }
     .kv span { color: #666; font-size: 17.5px; }
+    /* 网格内去掉虚线分隔、收紧行距：简单图例 3 列，色标/权限图例左右两栏 */
+    .sidecard .kv { border-bottom: none; padding: 4px 2px; }
+    .sidecard .kvgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 20px; }
+    .sidecard .sidecols { display: grid; grid-template-columns: auto minmax(0, 480px); gap: 0 60px; margin-top: 8px; }
     .diffs { display: flex; gap: 8px; margin-top: 4px; }
     .diffs i {
       font-style: normal; font-size: 16px; color: #fff;
@@ -139,7 +146,10 @@
         <div class="group">{{group.group}}</div>
         {{each group.list item}}
         <div class="row">
-          <div class="cmd">{{item.title}}</div>
+          <div class="cmd">
+            <div class="name">{{item.title}}</div>
+            {{if item.params}}<div class="params">{{item.params}}</div>{{/if}}
+          </div>
           <div class="info">
             <div class="desc">{{if item.tags.length}}{{each item.tags t}}<i class="tag {{t.cls}}">{{t.label}}</i>{{/each}}{{/if}}{{item.desc}}</div>
             {{if item.eg}}<div class="eg">{{item.eg}}</div>{{/if}}
@@ -148,32 +158,36 @@
         {{/each}}
       </div>
       {{/each}}
-      {{if ci === 2 && !hideSideCard}}
+      {{if !hideSideCard}}
       <div class="card sidecard">
         <div class="group">参数说明</div>
-        <div class="kv"><b>&lt;&gt;</b><span>必带参数</span></div>
-        <div class="kv"><b>[]</b><span>可选参数</span></div>
-        <div class="kv"><b>难度色</b><span>绿 黄 红 紫 白</span></div>
-        <div class="kv"><b>定数</b><span>谱面定数，如 13.6</span></div>
-        <div class="kv"><b>条件</b><span>fc / ap / fs / fsd / sss 等</span></div>
-        <div class="kv"><b>曲名</b><span>支持 id、标题、别名</span></div>
-        <div class="kv">
-          <b>难度色标</b>
-          <div class="diffs">
-            <i style="background:#81d955">绿</i>
-            <i style="background:#f5bd15">黄</i>
-            <i style="background:#ff818d">红</i>
-            <i style="background:#9f51dc">紫</i>
-            <i style="background:#e6c5ff">白</i>
-          </div>
+        <div class="kvgrid">
+          <div class="kv"><b>&lt;&gt;</b><span>必带参数</span></div>
+          <div class="kv"><b>[]</b><span>可选参数</span></div>
+          <div class="kv"><b>难度色</b><span>绿 黄 红 紫 白</span></div>
+          <div class="kv"><b>定数</b><span>谱面定数，如 13.6</span></div>
+          <div class="kv"><b>条件</b><span>fc / ap / fs / fsd / sss 等</span></div>
+          <div class="kv"><b>曲名</b><span>支持 id、标题、别名</span></div>
         </div>
-        <div class="kv">
-          <b>权限/场景</b>
-          <div class="legend">
-            <span><i class="tag ta">A</i>需管理员</span>
-            <span><i class="tag tm">M</i>需主人</span>
-            <span><i class="tag tg">G</i>仅群聊</span>
-            <span><i class="tag tp">P</i>仅私聊</span>
+        <div class="sidecols">
+          <div class="kv">
+            <b>难度色标</b>
+            <div class="diffs">
+              <i style="background:#81d955">绿</i>
+              <i style="background:#f5bd15">黄</i>
+              <i style="background:#ff818d">红</i>
+              <i style="background:#9f51dc">紫</i>
+              <i style="background:#e6c5ff">白</i>
+            </div>
+          </div>
+          <div class="kv">
+            <b>权限/场景</b>
+            <div class="legend">
+              <span><i class="tag ta">A</i>需管理员</span>
+              <span><i class="tag tm">M</i>需主人</span>
+              <span><i class="tag tg">G</i>仅群聊</span>
+              <span><i class="tag tp">P</i>仅私聊</span>
+            </div>
           </div>
         </div>
         <div class="note">命令头可在 config.yaml 中修改（cmdhead），改后需重启。<br>口语指令与命令头指令行为一致，无需加前缀。</div>

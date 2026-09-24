@@ -12,8 +12,11 @@ test('帮助数据：{head} 占位符替换为当前命令头', () => {
     assert.ok(!item.eg.includes('{head}'), 'eg 不应残留占位符')
     // desc 也必须替换：漏掉会把字面量 {head} 印到帮助图上（fsline 条目曾如此）
     assert.ok(!String(item.desc ?? '').includes('{head}'), `desc 不应残留占位符：${item.title}`)
+    // params 为 title 拆分出的参数第二行（口语中嵌句式等无 params），同样不得残留占位符
+    assert.ok(!String(item.params ?? '').includes('{head}'), `params 不应残留占位符：${item.title}`)
   }
   assert.ok(all.some(i => i.eg.includes('#maidx')), '示例应包含新命令头')
+  assert.ok(all.some(i => i.params), '应存在带参数行（params）的条目')
 })
 
 test('帮助数据：默认命令头与分组结构', () => {

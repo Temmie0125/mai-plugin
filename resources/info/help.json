@@ -3,12 +3,14 @@
     "group": "查询成绩",
     "list": [
       {
-        "title": "b50 [用户名]",
+        "title": "b50",
+        "params": "[用户名]",
         "eg": "#{head} b50",
         "desc": "查询 B50 最佳成绩（@他人可查对方）"
       },
       {
-        "title": "ap50 [用户名]",
+        "title": "ap50",
+        "params": "[用户名]",
         "eg": "#{head} ap50",
         "desc": "查询 AP50 最佳成绩（仅落雪数据源）"
       },
@@ -28,37 +30,44 @@
         "desc": "刷新并缓存本人 B50 与全量成绩（与曲库同步无关）"
       },
       {
-        "title": "score <曲名|ID|别名>",
+        "title": "score",
+        "params": "<曲名|ID|别名>",
         "eg": "#{head} score 茄子",
         "desc": "单曲成绩卡（含全难度，无需指定难度）"
       },
       {
-        "title": "ginfo <曲名|id> [难度色]",
+        "title": "ginfo",
+        "params": "<曲名|id> [难度色]",
         "eg": "#{head} ginfo 茄子",
         "desc": "查询单曲全服统计数据"
       },
       {
-        "title": "song <曲名|ID|别名>",
+        "title": "song",
+        "params": "<曲名|ID|别名>",
         "eg": "#{head} song 11365",
         "desc": "曲目详情卡（精确直查；多条结果自动列表/图）"
       },
       {
-        "title": "search <关键词> [页]",
+        "title": "search",
+        "params": "<关键词> [页]",
         "eg": "#{head} search 定数14+",
         "desc": "曲目检索列表（曲名/别名/定数/bpm/物量/曲师/谱师，支持区间；谱师认中文叫法，如 哈皮 → はっぴー）"
       },
       {
-        "title": "what <词>",
+        "title": "what",
+        "params": "<词>",
         "eg": "#{head} what 嗦",
         "desc": "根据别名反查歌曲"
       },
       {
-        "title": "fsline <难度色><曲名|id|别名>[目标达成率]",
+        "title": "fsline",
+        "params": "<难度色><曲名|id|别名>[目标达成率]",
         "eg": "#{head} fsline 紫799 100",
         "desc": "计算曲目的分数线容错（帮助：#{head} fsline 帮助）"
       },
       {
-        "title": "rank [页码|用户名]",
+        "title": "rank",
+        "params": "[页码|用户名]",
         "eg": "#{head} rank 2",
         "desc": "水鱼 Rating 排行榜"
       },
@@ -73,22 +82,26 @@
     "group": "表格成绩",
     "list": [
       {
-        "title": "table <定数>",
+        "title": "table",
+        "params": "<定数>",
         "eg": "#{head} table 14",
         "desc": "查看指定定数的歌曲表"
       },
       {
-        "title": "plate <定数> [fc|ap]",
+        "title": "plate",
+        "params": "<定数> [fc|ap]",
         "eg": "#{head} plate 13 fc",
         "desc": "定数完成表（fc/ap 计划；不填为全清表）"
       },
       {
-        "title": "plate <版本称号> [页]",
+        "title": "plate",
+        "params": "<版本称号> [页]",
         "eg": "#{head} plate 真极",
         "desc": "版本牌子完成表（如：真极；舞/霸分两页）"
       },
       {
-        "title": "plate <版本称号> 进度",
+        "title": "plate",
+        "params": "<版本称号> 进度",
         "eg": "#{head} plate 真极 进度",
         "desc": "版本牌子完成进度"
       },
@@ -98,12 +111,14 @@
         "desc": "牌子条件说明"
       },
       {
-        "title": "progress <定数> <目标> [页]",
+        "title": "progress",
+        "params": "<定数> <目标> [页]",
         "eg": "#{head} progress 14 ap",
         "desc": "等级达成进度"
       },
       {
-        "title": "list <定数|理论|新歌|旧版本> [页]",
+        "title": "list",
+        "params": "<定数|理论|新歌|旧版本> [页]",
         "eg": "#{head} list 14",
         "desc": "分数列表：定数 / 理论值(AP+) / 当前版本 / 旧版本（按 Rating 降序）"
       }
@@ -113,27 +128,32 @@
     "group": "绑定与设置",
     "list": [
       {
-        "title": "bind <lxns|df>",
+        "title": "bind",
+        "params": "<lxns|df>",
         "eg": "#{head} bind lxns",
         "desc": "绑定查分器(支持落雪/水鱼)"
       },
       {
-        "title": "bind qq <QQ号>",
+        "title": "bind qq",
+        "params": "<QQ号>",
         "eg": "#{head} bind qq 114514",
         "desc": "(官方Bot)提供QQ以解锁水鱼限制; clear解除"
       },
       {
-        "title": "unbind <lxns|df|qq>",
+        "title": "unbind",
+        "params": "<lxns|df|qq>",
         "eg": "#{head} unbind lxns",
         "desc": "解除对应绑定(落雪/水鱼/QQ)"
       },
       {
-        "title": "source <数据源>",
+        "title": "source",
+        "params": "<数据源>",
         "eg": "#{head} source 1",
         "desc": "切换数据源(0=水鱼,1=落雪;绑定落雪会自动切换)"
       },
       {
-        "title": "theme <主题>",
+        "title": "theme",
+        "params": "<主题>",
         "eg": "#{head} theme 1",
         "desc": "切换渲染主题（支持数字或主题名）"
       }
@@ -155,7 +175,8 @@
         "scene": "group"
       },
       {
-        "title": "guess on|off / reset",
+        "title": "guess",
+        "params": "on|off / reset",
         "eg": "#{head} guess on",
         "desc": "开启/关闭/重置猜歌",
         "permission": "admin",
@@ -168,7 +189,8 @@
         "scene": "group"
       },
       {
-        "title": "open <字母>",
+        "title": "open",
+        "params": "<字母>",
         "eg": "#open J",
         "desc": "翻开字母",
         "scene": "group"
@@ -192,17 +214,20 @@
         "desc": "今日舞萌运势"
       },
       {
-        "title": "rand [类型][颜色][定数]",
+        "title": "rand",
+        "params": "[类型][颜色][定数]",
         "eg": "#{head} rand dx紫14",
         "desc": "随机谱面（定数支持字面/小数/区间：13、14.9、13-14）"
       },
       {
-        "title": "rise [等级] [分数]",
+        "title": "rise",
+        "params": "[等级] [分数]",
         "eg": "#{head} rise 14 20",
         "desc": "上分推荐（@他人可查对方）"
       },
       {
-        "title": "com|calc|计算 <定数> <达成率>",
+        "title": "com|calc|计算",
+        "params": "<定数> <达成率>",
         "eg": "#{head} calc 13.6 100.5",
         "desc": "单曲 Rating 计算器（免绑定）"
       }
@@ -212,22 +237,26 @@
     "group": "别名",
     "list": [
       {
-        "title": "alias <曲名>",
+        "title": "alias",
+        "params": "<曲名>",
         "eg": "#{head} alias 茄子",
         "desc": "查看歌曲别名"
       },
       {
-        "title": "alias apply <id> <别名>",
+        "title": "alias apply",
+        "params": "<id> <别名>",
         "eg": "#{head} alias apply 277 脑天",
         "desc": "申请新别名（群内投票）"
       },
       {
-        "title": "alias votes [页] / alias vote <标签|#编号>",
+        "title": "alias votes / alias vote",
+        "params": "[页] / <标签|#编号>",
         "eg": "#{head} alias votes",
         "desc": "查看进行中的别名投票（图内带编号）/ 投票，投票可简写「#{head} vote #1」"
       },
       {
-        "title": "alias local <id> <别名>",
+        "title": "alias local",
+        "params": "<id> <别名>",
         "eg": "#{head} alias local 799 茄",
         "desc": "添加本地别名"
       },
@@ -238,14 +267,16 @@
         "permission": "master"
       },
       {
-        "title": "push on|off",
+        "title": "push",
+        "params": "on|off",
         "eg": "#{head} push on",
         "desc": "群别名推送开关",
         "permission": "admin",
         "scene": "group"
       },
       {
-        "title": "push global on|off",
+        "title": "push global",
+        "params": "on|off",
         "eg": "#{head} push global on",
         "desc": "全局别名推送开关",
         "permission": "master"
@@ -295,7 +326,8 @@
         "desc": "随机一首歌 / 带上分字样时推荐上分曲目"
       },
       {
-        "title": "来首/随个/给个 [dx|sd][颜色]<定数>",
+        "title": "来首/随个/给个",
+        "params": "[dx|sd][颜色]<定数>",
         "eg": "来个紫14",
         "desc": "随机谱面（定数支持字面/小数/区间：13、14.9、13-14）"
       },

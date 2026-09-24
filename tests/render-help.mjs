@@ -31,25 +31,30 @@ if (!global.redis) {
   }
 }
 
-const { renderHelp } = await import('../lib/render/picmodle.js')
+const { renderHelp, renderVariantHelp } = await import('../lib/render/picmodle.js')
 
 const t0 = Date.now()
-const result = await renderHelp('mai', 'v0.1.0')
 
-if (!Buffer.isBuffer(result)) {
-  console.error('渲染失败：', result)
-  process.exit(1)
+// 主帮助页与「随心配 B50」专题帮助页共用 help.html，冒烟一并覆盖（saveId 区分产物）
+async function smoke(name, render) {
+  const result = await render()
+  if (!Buffer.isBuffer(result)) {
+    console.error(`${name} 渲染失败：`, result)
+    process.exit(1)
+  }
+  const out = path.join(path.dirname(fileURLToPath(import.meta.url)), name)
+  fs.writeFileSync(out, result)
+  console.log(`[ok] ${name} ${ (result.length / 1024).toFixed(1) }KB ${Date.now() - t0}ms → ${out}`)
+  // JPEG 魔数校验（渲染默认 imgType:jpeg）
+  const magic = result.subarray(0, 3).toString('hex')
+  if (magic !== 'ffd8ff') {
+    console.error('输出不是合法 JPEG，魔数：', magic)
+    process.exit(1)
+  }
 }
 
-const out = path.join(path.dirname(fileURLToPath(import.meta.url)), 'help.jpg')
-fs.writeFileSync(out, result)
-console.log(`[ok] help.jpg ${ (result.length / 1024).toFixed(1) }KB ${Date.now() - t0}ms → ${out}`)
+await smoke('help.jpg', () => renderHelp('mai', 'v0.1.0'))
+await smoke('varianthelp.jpg', () => renderVariantHelp('mai', 'v0.1.0'))
 
-// JPEG 魔数校验（渲染默认 imgType:jpeg）
-const magic = result.subarray(0, 3).toString('hex')
-if (magic !== 'ffd8ff') {
-  console.error('输出不是合法 JPEG，魔数：', magic)
-  process.exit(1)
-}
 console.log('[ok] JPEG 魔数校验通过 · 渲染管线全通')
 process.exit(0) // 宿主渲染器的 chokidar watcher 会保持事件循环，主动退出
