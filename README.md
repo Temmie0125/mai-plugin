@@ -144,7 +144,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 **官方 QQBot 适配**（`config.yaml`「官方QQBot适配」组，OneBot 用户无需改动）：
 
 - `quoteReply`（默认开启）：关闭后本插件所有回复不再引用用户消息。官方 QQBot 下带图回复的引用在部分设备（如鸿蒙端）无法显示图片，可关闭规避；
-- `qqBotButtons`（默认开启，**仅官方 QQBot 生效**，OneBot 不支持按钮）：B50 / 谱面卡 / 帮助图等业务图回复附带常用命令按钮，点击仅把命令预填进输入框，不自动发送，便于先补参数再发出。
+- `qqBotButtons`（默认开启，**仅官方 QQBot 生效**，OneBot 不支持按钮）：B50 / 谱面卡 / 帮助图等业务图回复附带常用命令按钮，图鉴/成绩卡还会把歌曲 id 预填进「查成绩 / 分数线」。点击仅把命令预填进输入框，不自动发送，便于先补参数再发出；按钮发出时图后的文字操作提示（「可使用「#mai theme」…」）会自动省去。
 
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。
 

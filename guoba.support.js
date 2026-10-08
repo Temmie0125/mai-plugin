@@ -79,8 +79,9 @@ export function supportGuoba() {
         {
           field: 'qqBotButtons',
           label: '快捷按钮',
-          bottomHelpMessage: '仅官方 QQBot 生效（OneBot 不支持按钮）：业务图回复附带常用命令按钮，'
-            + '点击仅把命令预填进输入框（不自动发送，便于先补参数再发出）',
+          bottomHelpMessage: '仅官方 QQBot 生效（OneBot 不支持按钮）：业务图回复附带常用命令按钮'
+            + '（图鉴/成绩卡会预填歌曲 id），点击仅把命令预填进输入框、不自动发送；'
+            + '按钮发出时图后的文字操作提示会自动省去',
           component: 'Switch',
         },
         {

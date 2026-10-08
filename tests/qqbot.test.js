@@ -17,8 +17,9 @@ if (!global.logger) {
   })
 }
 
-const { isQQBot, hasImage, breakAroundImages, buttonSegment, MaiPlugin } =
+const { isQQBot, hasImage, breakAroundImages, buttonSegment, stripBizHint, MaiPlugin } =
   await import('../lib/qqbot.js')
+const { MESSAGE } = await import('../lib/handler.js')
 const Config = (await import('../lib/config.js')).default
 
 // ===== 桩：segment 与配置 =====
@@ -138,9 +139,47 @@ test('buttonSegment：生成按钮段并替换命令头，未知预设返回 nul
   assert.equal(buttonSegment('不存在的预设'), null)
 })
 
+test('buttonSegment：chart 场景 {id} 按歌曲 id 预填，无 id 时留空', () => {
+  stubSegment()
+  const withId = buttonSegment({ name: 'chart', songId: 1150 }).data.flat()
+  assert.deepEqual(
+    withId.map(b => b.input),
+    ['#mai score 1150', '#mai fsline 1150'],
+  )
+  // 无 songId → {id} 留空，退化为只预填命令（保留尾随空格供续填曲名/参数）
+  const noId = buttonSegment('chart').data.flat()
+  assert.deepEqual(noId.map(b => b.input), ['#mai score ', '#mai fsline '])
+  // 非法 songId 一并留空；其他场景不受 songId 影响
+  assert.deepEqual(
+    buttonSegment({ name: 'chart', songId: '<script>' }).data.flat().map(b => b.input),
+    ['#mai score ', '#mai fsline '],
+  )
+  assert.ok(buttonSegment({ name: 'b50', songId: 1150 }).data.flat().every(b => !b.input.includes('1150')))
+})
+
 test('buttonSegment：宿主无 segment.button 时返回 null', () => {
   globalThis.segment = {}
   assert.equal(buttonSegment('image'), null)
+})
+
+// ===== stripBizHint =====
+
+test('stripBizHint：只撤 MESSAGE() 提示附言，其他文本与统计文本不受影响', () => {
+  const img = { type: 'image', file: 'x' }
+  // [图, 提示] → 提示被撤
+  assert.deepEqual(stripBizHint([img, MESSAGE()], MESSAGE()), [img])
+  // 带前导换行的同款（图文换行后的形态）→ 仍识别
+  assert.deepEqual(stripBizHint([img, `\n${MESSAGE()}`], MESSAGE()), [img])
+  // text 段形态
+  assert.deepEqual(stripBizHint([img, { type: 'text', text: MESSAGE() }], MESSAGE()), [img])
+  // 全服统计等业务附言 ≠ MESSAGE() → 保留
+  const stats = 'Master：12345 次（10.00%）'
+  assert.deepEqual(stripBizHint([img, stats], MESSAGE()), [img, stats])
+  // 普通前导文本保留
+  assert.deepEqual(stripBizHint(['前言', img, MESSAGE()], MESSAGE()), ['前言', img])
+  // 纯字符串载荷与「撤空防御」：全被撤时保持原样
+  assert.equal(stripBizHint('纯文本', MESSAGE()), '纯文本')
+  assert.deepEqual(stripBizHint([MESSAGE()], MESSAGE()), [MESSAGE()])
 })
 
 // ===== MaiPlugin.reply =====
@@ -223,6 +262,30 @@ test('reply：qqBotButtons=false 不附按钮，换行仍生效', async () => {
   }
 })
 
+test('reply：按钮发出时撤提示附言；发不出时附言照旧', async () => {
+  stubSegment()
+  const restore = stubConfig({ quoteReply: true, qqBotButtons: true })
+  try {
+    // 按钮 + MESSAGE() 提示并存 → 提示被撤
+    const { p, sent } = makePlugin({ adapter_name: 'QQBot' })
+    await p.reply([IMG, MESSAGE()], true)
+    const [msg] = sent[0]
+    assert.ok(msg.every(v => (typeof v === 'string' ? v : v?.text) !== MESSAGE()), '附言应被撤掉')
+    assert.equal(msg.at(-1).type, 'button')
+    assert.equal(msg.filter(v => v?.type === 'image').length, 1, '图片保留')
+
+    // 宿主缺 segment.button → 按钮发不出 → 附言照旧（用户仍有文字引导）
+    globalThis.segment = {}
+    const p2 = makePlugin({ adapter_name: 'QQBot' })
+    await p2.p.reply([IMG, MESSAGE()], true)
+    const [msg2] = p2.sent[0]
+    assert.ok(msg2.some(v => (typeof v === 'string' ? v : v?.text)?.replace?.(/^\n+/, '') === MESSAGE()))
+    assert.ok(msg2.every(v => v?.type !== 'button'))
+  } finally {
+    restore()
+  }
+})
+
 test('reply：data.qqBtn 场景预设（纯文本载荷也按场景附按钮）', async () => {
   stubSegment()
   const restore = stubConfig({ quoteReply: true, qqBotButtons: true })
@@ -233,6 +296,21 @@ test('reply：data.qqBtn 场景预设（纯文本载荷也按场景附按钮）'
     assert.equal(msg.at(-1).type, 'button')
     const rows = msg.at(-1).data
     assert.ok(rows.flat().some(b => b.input.includes('拟合b50')))
+  } finally {
+    restore()
+  }
+})
+
+test('reply：data.qqBtn 传 {name, songId} → 按钮 input 预填歌曲 id', async () => {
+  stubSegment()
+  const restore = stubConfig({ quoteReply: true, qqBotButtons: true })
+  try {
+    const { p, sent } = makePlugin({ adapter_name: 'QQBot' })
+    await p.reply([IMG, MESSAGE()], true, { qqBtn: { name: 'chart', songId: 1150 } })
+    const [msg] = sent[0]
+    const flat = msg.at(-1).data.flat()
+    assert.deepEqual(flat.map(b => b.input), ['#mai score 1150', '#mai fsline 1150'])
+    assert.ok(msg.every(v => (typeof v === 'string' ? v : v?.text) !== MESSAGE()))
   } finally {
     restore()
   }

@@ -279,7 +279,7 @@ export class MaiSong extends MaiPlugin {
 
     if (!forceList && songs.length === 1) {
       const payload = await drawChartInfo(songs[0], user)
-      await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
+      await this.reply(toSegment(payload), true, { qqBtn: { name: 'chart', songId: songs[0].song_id } })
     } else if (songs.length <= 5) {
       const body = songs.map(songLine).join('\n')
       await this.reply(aliasHeader ? [aliasHeader, body, idHint].join('\n') : body, true)
@@ -344,7 +344,7 @@ export class MaiSong extends MaiPlugin {
         const payload = await drawChartInfo(song, user)
         const first = typeof payload === 'string' ? payload : toSegment(payload)
         const arr = Array.isArray(first) ? first : [first]
-        await this.reply(['您要找的是不是：', ...arr], true, { qqBtn: 'chart' })
+        await this.reply(['您要找的是不是：', ...arr], true, { qqBtn: { name: 'chart', songId: song.song_id } })
       } else {
         await this.reply(errorMsg, true)
       }
@@ -357,7 +357,7 @@ export class MaiSong extends MaiPlugin {
       if (song) {
         const payload = await drawChartInfo(song, user)
         const first = typeof payload === 'string' ? payload : toSegment(payload)
-        await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true, { qqBtn: 'chart' })
+        await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true, { qqBtn: { name: 'chart', songId: song.song_id } })
         return true
       }
     }
@@ -370,7 +370,7 @@ export class MaiSong extends MaiPlugin {
       }
       const payload = await drawChartInfo(song, user)
       const first = typeof payload === 'string' ? payload : toSegment(payload)
-      await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true, { qqBtn: 'chart' })
+      await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true, { qqBtn: { name: 'chart', songId: song.song_id } })
       return true
     }
 

@@ -226,7 +226,7 @@ export class MaiRand extends MaiPlugin {
     const song = songs[Math.floor(Math.random() * songs.length)]
     // 源 GetUserAndAuthOrNone：拿不到用户（未绑定/落雪未授权）时 user=None，draw_chart_info 落到 prism_plus
     const got = await getUserAndAuth(e, { autoCreate: true, requireAuth: true, checkSkip: true })
-    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true, { qqBtn: 'chart' })
+    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true, { qqBtn: { name: 'chart', songId: song.song_id } })
     return true
   }
 }
@@ -259,7 +259,7 @@ export class MaiRandSay extends MaiPlugin {
     }
     const song = songs[Math.floor(Math.random() * songs.length)]
     const got = await getUserAndAuth(e, { autoCreate: true, requireAuth: true, checkSkip: true })
-    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true, { qqBtn: 'chart' })
+    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true, { qqBtn: { name: 'chart', songId: song.song_id } })
     return true
   }
 }
@@ -370,7 +370,7 @@ export class MaiFun extends MaiPlugin {
       if (recommended != null && typeof recommended !== 'string') song = recommended
     }
     const payload = await drawChartInfo(song, user)
-    await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
+    await this.reply(toSegment(payload), true, { qqBtn: { name: 'chart', songId: song.song_id } })
     return false
   }
 }

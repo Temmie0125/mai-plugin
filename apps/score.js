@@ -187,12 +187,12 @@ export class MaiScore extends MaiPlugin {
     if (found.multi) {
       awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
         const payload = await drawPlayData(user, song)
-        await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
+        await this.reply(toSegment(payload), true, { qqBtn: { name: 'chart', songId: song.song_id } })
       })
       return true
     }
     const payload = await drawPlayData(user, found.song)
-    await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
+    await this.reply(toSegment(payload), true, { qqBtn: { name: 'chart', songId: found.song.song_id } })
     return true
   }
 
