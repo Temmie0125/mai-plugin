@@ -8,7 +8,7 @@
  * 与原版输出的差异：去掉 Rating 的小数附注（游戏内只取整，非游戏值），
  * 补充评价字母一行；分档、上限截断（100.5）与错误文案均沿用原版口径。
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { head } from '../lib/config.js'
 import { computeRating, getBaseRa } from '../lib/calc.js'
 
@@ -67,7 +67,7 @@ export function formatComResult(ds, acc) {
 }
 
 /** #mai com|calc|计算 <定数> <达成率>（收编自 plugins/example/maicom.js） */
-export class MaiRating extends plugin {
+export class MaiRating extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-rating',

@@ -9,7 +9,7 @@
  *
  * 群开关是**白名单**（D4）：`lib/database.js:getGroup().guess` 默认 false，未显式开启的群不可用。
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { head } from '../lib/config.js'
 import * as database from '../lib/database.js'
 import { ensureReady } from '../lib/service.js'
@@ -65,7 +65,7 @@ async function cardPayload(song) {
  * #mai guess（猜歌）/ #mai guessill（猜曲绘）/ #mai guess on|off|reset
  * 起手三条在 priority 100；答题兜底另起一类在 priority 200（必须先让所有主命令过一遍）
  */
-export class MaiGuess extends plugin {
+export class MaiGuess extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-guess',
@@ -247,7 +247,7 @@ export class MaiGuess extends plugin {
  * 先让主命令有机会吃掉消息，剩下的才轮到这里裸答。
  * 未命中自身语义一律 `return false` 放行，绝不吞无关聊天。
  */
-export class MaiGuessAnswer extends plugin {
+export class MaiGuessAnswer extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-guess-answer',

@@ -141,6 +141,11 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 - `config.yaml`：命令头（`cmdhead`）、双查分器凭据、渲染参数、静态资源包地址与自动更新（`assetsRepo` / `autoUpdateAssets`）、绑定授权消息自动撤回（`autoRecallAuthMsg`，默认开启）、每日自动同步（`autoSync` / `autoSyncTime`）等，修改后重启生效；
 - `banGroup.yaml`：封禁群列表。
 
+**官方 QQBot 适配**（`config.yaml`「官方QQBot适配」组，OneBot 用户无需改动）：
+
+- `quoteReply`（默认开启）：关闭后本插件所有回复不再引用用户消息。官方 QQBot 下带图回复的引用在部分设备（如鸿蒙端）无法显示图片，可关闭规避；
+- `qqBotButtons`（默认开启，**仅官方 QQBot 生效**，OneBot 不支持按钮）：B50 / 谱面卡 / 帮助图等业务图回复附带常用命令按钮，点击仅把命令预填进输入框，不自动发送，便于先补参数再发出。
+
 装有 Guoba-Plugin 时可在面板中直接修改以上配置项。
 
 > [!NOTE]

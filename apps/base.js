@@ -2,7 +2,7 @@
  * #mai 基命令：帮助图 / 无子命令兜底提示（设计 §3.2-2）
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import Config, { head } from '../lib/config.js'
 import { renderHelp, toSegment } from '../lib/render/picmodle.js'
 import { checkReadiness } from '../lib/render/assets.js'
@@ -11,7 +11,7 @@ const { version } = pkg
 
 const H = () => head()
 
-export class MaiBase extends plugin {
+export class MaiBase extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-base',
@@ -36,7 +36,7 @@ export class MaiBase extends plugin {
     }
     const cmdHead = Config.getUserCfg('config', 'cmdhead')
     const result = await renderHelp(cmdHead, `v${version}`)
-    await this.reply(toSegment(result))
+    await this.reply(toSegment(result), false, { qqBtn: 'help' })
     return true
   }
 }

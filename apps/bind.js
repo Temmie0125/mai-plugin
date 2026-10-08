@@ -11,7 +11,7 @@
  * - 绑定失败按源两档文案分类（LXNS 六错误类 → 「授权码可能已使用/过期」；其余 → 「暂时失败」），
  *   显式 instanceof 名单（JS ApiError 单根无法按根分类），不进 handlerError 查询文案表
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import Config, { head } from '../lib/config.js'
 import * as database from '../lib/database.js'
 import { getUserAndAuth, effectiveService } from '../lib/user.js'
@@ -335,7 +335,7 @@ export function classifyBindError(error) {
     : BINDING_TEMPORARY_FAILED_MSG
 }
 
-export class MaiBind extends plugin {
+export class MaiBind extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-bind',

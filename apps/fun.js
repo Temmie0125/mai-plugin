@@ -6,7 +6,7 @@
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  */
 import fs from 'node:fs'
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { head } from '../lib/config.js'
 import { getUserAndAuth } from '../lib/user.js'
 import { drawChartInfo, drawRiseScoreList, getMaiWhat } from '../lib/handler.js'
@@ -152,7 +152,7 @@ async function sendFortune(ctx, e) {
 }
 
 /** #mai fortune / jrrp / 今日舞萌 —— 源 mai_base.py:310-337（D6：宜忌改三分类 4+4） */
-export class MaiFortune extends plugin {
+export class MaiFortune extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-fortune',
@@ -171,7 +171,7 @@ export class MaiFortune extends plugin {
 }
 
 /** 免前缀「今日舞萌」（本仓口语规则约定：priority 1500、log:false） */
-export class MaiFortuneSay extends plugin {
+export class MaiFortuneSay extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-fortune-say',
@@ -190,7 +190,7 @@ export class MaiFortuneSay extends plugin {
 }
 
 /** #mai rand <类型><颜色><定数> —— 源 mai_base.py:357-385 的收编形态（设计 §3.2-11） */
-export class MaiRand extends plugin {
+export class MaiRand extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-rand',
@@ -226,13 +226,13 @@ export class MaiRand extends plugin {
     const song = songs[Math.floor(Math.random() * songs.length)]
     // 源 GetUserAndAuthOrNone：拿不到用户（未绑定/落雪未授权）时 user=None，draw_chart_info 落到 prism_plus
     const got = await getUserAndAuth(e, { autoCreate: true, requireAuth: true, checkSkip: true })
-    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true)
+    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true, { qqBtn: 'chart' })
     return true
   }
 }
 
 /** 口语「来个/随个/给个 …」—— 源随机谱面的免前缀形态（设计 §3.2 保留清单） */
-export class MaiRandSay extends plugin {
+export class MaiRandSay extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-rand-say',
@@ -259,7 +259,7 @@ export class MaiRandSay extends plugin {
     }
     const song = songs[Math.floor(Math.random() * songs.length)]
     const got = await getUserAndAuth(e, { autoCreate: true, requireAuth: true, checkSkip: true })
-    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true)
+    await this.reply(toSegment(await drawChartInfo(song, got?.user ?? null)), true, { qqBtn: 'chart' })
     return true
   }
 }
@@ -275,7 +275,7 @@ export function parseRiseArgs(levelRaw, scoreRaw) {
   return { level, score }
 }
 
-export class MaiRise extends plugin {
+export class MaiRise extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-rise',
@@ -309,7 +309,7 @@ export class MaiRise extends plugin {
  * 口语「我要在13+上1分」 —— 源 rise_score 的免前缀形态（设计 §3.2-12 保留）
  * priority 1500、log:false；未命中语义一律 return false 放行
  */
-export class MaiRiseSay extends plugin {
+export class MaiRiseSay extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-rise-say',
@@ -340,7 +340,7 @@ export class MaiRiseSay extends plugin {
 }
 
 /** 口语「…mai…什么…」随机 / 推分（源 mai_what，设计 §3.2-10，P1 已交付） */
-export class MaiFun extends plugin {
+export class MaiFun extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-fun',
@@ -370,7 +370,7 @@ export class MaiFun extends plugin {
       if (recommended != null && typeof recommended !== 'string') song = recommended
     }
     const payload = await drawChartInfo(song, user)
-    await this.reply(toSegment(payload), true)
+    await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
     return false
   }
 }

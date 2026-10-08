@@ -8,7 +8,7 @@
  * - 随心配b50：按条件定制的 B50 家族（FC50/单刷50/东方50/全13b50/歌50…），
  *   解析层在 lib/variantSpec.js，规则与解析共用同一份 token 表（见该文件头）
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import Config, { head } from '../lib/config.js'
 import { checkReadiness } from '../lib/render/assets.js'
 import pkg from '../package.json' with { type: 'json' }
@@ -107,7 +107,7 @@ export function parseSong50Args(raw) {
   return { color: null, query: tokens.join(' ') }
 }
 
-export class MaiScore extends plugin {
+export class MaiScore extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-score',
@@ -157,7 +157,7 @@ export class MaiScore extends plugin {
     }
 
     const payload = await drawBest50(user, { username, allPerfect })
-    await this.reply(toSegment(payload), true)
+    await this.reply(toSegment(payload), true, { qqBtn: 'b50' })
     return true
   }
 
@@ -187,12 +187,12 @@ export class MaiScore extends plugin {
     if (found.multi) {
       awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
         const payload = await drawPlayData(user, song)
-        await this.reply(toSegment(payload), true)
+        await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
       })
       return true
     }
     const payload = await drawPlayData(user, found.song)
-    await this.reply(toSegment(payload), true)
+    await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
     return true
   }
 
@@ -221,7 +221,7 @@ export class MaiScore extends plugin {
     }
 
     const payload = await drawFitBest50(got.user)
-    await this.reply(toSegment(payload), true)
+    await this.reply(toSegment(payload), true, { qqBtn: 'b50' })
     return true
   }
 
@@ -297,11 +297,11 @@ export class MaiScore extends plugin {
 
     if (found.multi) {
       awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
-        await this.reply(toSegment(await drawSong50(got.user, song, levelIndex, sim)), true)
+        await this.reply(toSegment(await drawSong50(got.user, song, levelIndex, sim)), true, { qqBtn: 'b50' })
       })
       return true
     }
-    await this.reply(toSegment(await drawSong50(got.user, found.song, levelIndex, sim)), true)
+    await this.reply(toSegment(await drawSong50(got.user, found.song, levelIndex, sim)), true, { qqBtn: 'b50' })
     return true
   }
 
@@ -316,7 +316,7 @@ export class MaiScore extends plugin {
     }
     const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
     if (!got) return true
-    await this.reply(toSegment(await drawVariantBest50(got.user, spec)), true)
+    await this.reply(toSegment(await drawVariantBest50(got.user, spec)), true, { qqBtn: 'b50' })
     return true
   }
 
@@ -330,7 +330,7 @@ export class MaiScore extends plugin {
 
     const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
     if (!got) return true
-    await this.reply(toSegment(await drawVariantBest50(got.user, spec)), true)
+    await this.reply(toSegment(await drawVariantBest50(got.user, spec)), true, { qqBtn: 'b50' })
     return true
   }
 
@@ -361,7 +361,7 @@ export class MaiScore extends plugin {
 
     const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
     if (!got) return true
-    await this.reply(toSegment(await drawVariantBest50(got.user, spec)), true)
+    await this.reply(toSegment(await drawVariantBest50(got.user, spec)), true, { qqBtn: 'b50' })
     return true
   }
 }

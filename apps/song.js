@@ -13,7 +13,7 @@
  *   列表彩标只点亮命中物量的难度，对齐谱师过滤的 all_diff=false 语义）
  * - what / 「XX是什么歌」：本地别名 → 柚子投票态 → id → 标题链（口语正则保留，priority 1500）
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { head } from '../lib/config.js'
 import { getUserAndAuth } from '../lib/user.js'
 import { drawChartInfo, drawSongList, drawVoteList, sortVotes, hasNumericQq, ALIAS_QQ_HINT } from '../lib/handler.js'
@@ -218,7 +218,7 @@ function songLine(song) {
   return `「${song.song_id}」`.padEnd(7) + ' ' + song.song_name
 }
 
-export class MaiSong extends plugin {
+export class MaiSong extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-song',
@@ -279,7 +279,7 @@ export class MaiSong extends plugin {
 
     if (!forceList && songs.length === 1) {
       const payload = await drawChartInfo(songs[0], user)
-      await this.reply(toSegment(payload), true)
+      await this.reply(toSegment(payload), true, { qqBtn: 'chart' })
     } else if (songs.length <= 5) {
       const body = songs.map(songLine).join('\n')
       await this.reply(aliasHeader ? [aliasHeader, body, idHint].join('\n') : body, true)
@@ -344,7 +344,7 @@ export class MaiSong extends plugin {
         const payload = await drawChartInfo(song, user)
         const first = typeof payload === 'string' ? payload : toSegment(payload)
         const arr = Array.isArray(first) ? first : [first]
-        await this.reply(['您要找的是不是：', ...arr], true)
+        await this.reply(['您要找的是不是：', ...arr], true, { qqBtn: 'chart' })
       } else {
         await this.reply(errorMsg, true)
       }
@@ -357,7 +357,7 @@ export class MaiSong extends plugin {
       if (song) {
         const payload = await drawChartInfo(song, user)
         const first = typeof payload === 'string' ? payload : toSegment(payload)
-        await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true)
+        await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true, { qqBtn: 'chart' })
         return true
       }
     }
@@ -370,7 +370,7 @@ export class MaiSong extends plugin {
       }
       const payload = await drawChartInfo(song, user)
       const first = typeof payload === 'string' ? payload : toSegment(payload)
-      await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true)
+      await this.reply(['您要找的是不是：', ...(Array.isArray(first) ? first : [first])], true, { qqBtn: 'chart' })
       return true
     }
 
@@ -419,7 +419,7 @@ function aliasArgs(e, reg) {
  * 通配查询殿后，同 priority 先命中先服务（禁复杂负向前瞻）。
  * 本仓 `apps/table.js` 同样依赖顺序，`tests/tableRules.test.js` 有「规则表顺序」测试锁着。
  */
-export class MaiAlias extends plugin {
+export class MaiAlias extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-alias',
@@ -710,7 +710,7 @@ export function resolveAliasTargets(raw) {
 }
 
 /** 口语「XX是什么歌」（无命令头，priority 1500 后置；命中处理后 return false 放行，源非阻塞语义） */
-export class MaiSongSay extends plugin {
+export class MaiSongSay extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-song-say',
@@ -726,7 +726,7 @@ export class MaiSongSay extends plugin {
   async whatIs(e) {
     // 口语规则静默降级：未就绪时静默重试一次，失败不回复（不打扰普通聊天）
     if (!mai.ready && !(await mai.init().catch(() => false))) return false
-    // 原型委托复用 MaiSong.whatIs（this = MaiSongSay 实例，reply 同样继承宿主 plugin 基类）——
+    // 原型委托复用 MaiSong.whatIs（this = MaiSongSay 实例，reply 同样继承 MaiPlugin 基类）——
     // 不 new MaiSong(e)：宿主 plugin 子类每次消息现构造有副作用/异常风险（真机静默故障源）
     return MaiSong.prototype.whatIs.call(this, e)
   }

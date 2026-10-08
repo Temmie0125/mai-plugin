@@ -3,7 +3,7 @@
  * 视觉设计派生自 nonebot-plugin-maimaidx（Yuri-YuzuChaN）及上游 mai-bot
  * 难度色前缀（绿黄红紫白）→ level_index，默认紫(Master)；附全服统计文本。
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { head } from '../lib/config.js'
 import {
   FSLINE_ARGS_ERRORS, FSLINE_FORMAT_ERROR, FSLINE_HELP, drawFsline, drawSongGlobalData, fslineText,
@@ -73,7 +73,7 @@ export function parseFslineArgs(raw) {
   return { ok: false, reason: 'missingColor' }
 }
 
-export class MaiGlobal extends plugin {
+export class MaiGlobal extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-global',

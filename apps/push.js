@@ -12,7 +12,7 @@
  * 权限走宿主 `rule.permission`（`lib/plugins/loader.js:filtPermission`）：master 恒放行，
  * 群聊内再校验 `e.member.is_owner/is_admin`。
  */
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { head } from '../lib/config.js'
 import { updateGroup, updateGroups } from '../lib/database.js'
 import { reevaluate } from '../lib/aliasSse.js'
@@ -60,7 +60,7 @@ export async function getAllGroups(bot) {
   return [...ids]
 }
 
-export class MaiPush extends plugin {
+export class MaiPush extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-push',

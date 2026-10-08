@@ -15,7 +15,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import { staticRoot } from '../lib/path.js'
 import { head } from '../lib/config.js'
 import { ensureReady } from '../lib/service.js'
@@ -138,7 +138,7 @@ export function parseVersionPlate(ver, plan, kindRaw, pageRaw) {
  * 靠「数字」与「版本字」互斥天然消歧；plateinfo 无空格，与 `plate\s+…` 本就不冲突。
  * 末尾的 plate 兜底垫底：只接住前面规则全都不收的 plate 输入并报错，杜绝静默无响应。
  */
-export class MaiTable extends plugin {
+export class MaiTable extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-table',
@@ -401,7 +401,7 @@ export class MaiTable extends plugin {
  * 口语「真极完成表」系列（源 mai_table.py:47 的免前缀形态，设计 §3.2-28 保留）
  * priority 1500、log:false，未命中自身语义一律 return false 放行
  */
-export class MaiTableSay extends plugin {
+export class MaiTableSay extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-table-say',

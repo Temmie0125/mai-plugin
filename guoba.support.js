@@ -67,6 +67,24 @@ export function supportGuoba() {
         },
         {
           component: 'Divider',
+          label: '官方QQBot适配'
+        },
+        {
+          field: 'quoteReply',
+          label: '引用回复',
+          bottomHelpMessage: '回复时引用用户的消息。官方 QQBot 下带图回复的引用在部分设备'
+            + '（如鸿蒙端）无法显示图片，遇到可关闭；OneBot 下显示正常，保持开启即可',
+          component: 'Switch',
+        },
+        {
+          field: 'qqBotButtons',
+          label: '快捷按钮',
+          bottomHelpMessage: '仅官方 QQBot 生效（OneBot 不支持按钮）：业务图回复附带常用命令按钮，'
+            + '点击仅把命令预填进输入框（不自动发送，便于先补参数再发出）',
+          component: 'Switch',
+        },
+        {
+          component: 'Divider',
           label: '列表与分页'
         },
         {

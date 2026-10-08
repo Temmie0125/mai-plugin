@@ -15,7 +15,7 @@
  */
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
-import plugin from '../../../lib/plugins/plugin.js'
+import { MaiPlugin } from '../lib/qqbot.js'
 import Config, { head } from '../lib/config.js'
 import { pluginRoot, staticRoot } from '../lib/path.js'
 import { syncAssets, hasGit } from '../lib/resourcePack.js'
@@ -84,7 +84,7 @@ export async function scheduleRestart(e, { load = loadSharedRestart, bot = globa
   return true
 }
 
-export class MaiManage extends plugin {
+export class MaiManage extends MaiPlugin {
   constructor() {
     super({
       name: 'mai-manage',
