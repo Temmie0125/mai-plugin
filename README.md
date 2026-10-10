@@ -232,6 +232,8 @@ node plugins/mai-plugin/tests/render-fsline.mjs    # 渲染冒烟 → tests/out/
 # 四表算法的对照基准由 tests/refs/gen-fsline-ref.mjs 真跑用户样板生成（fsline_ref.json 已入库，无需样板）
 ```
 
+上游（nonebot-plugin-maimaidx）的同步进度与处置表见 [docs/upstream-sync.md](docs/upstream-sync.md)——复查上游新提交前先读它的「当前锚点」。
+
 ---
 
 ## 许可

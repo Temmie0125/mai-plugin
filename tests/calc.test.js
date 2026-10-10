@@ -23,12 +23,13 @@ test('computeRating 基础档位', () => {
 })
 
 test('dxStar 阈值', () => {
-  assert.equal(dxStar(85), 0)
-  assert.equal(dxStar(85.1), 1)
-  assert.equal(dxStar(90), 1)
-  assert.equal(dxStar(93), 2)
-  assert.equal(dxStar(95), 3)
-  assert.equal(dxStar(97), 4)
+  // 边界 `<`（源 246bbd8）：恰好压线判高一档
+  assert.equal(dxStar(84.9), 0)
+  assert.equal(dxStar(85), 1)
+  assert.equal(dxStar(90), 2)
+  assert.equal(dxStar(93), 3)
+  assert.equal(dxStar(95), 4)
+  assert.equal(dxStar(97), 5)
   assert.equal(dxStar(97.1), 5)
 })
 
