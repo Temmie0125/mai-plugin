@@ -116,6 +116,16 @@ const OAUTH_FAILED_MSG = [
   '当前绑定会话仍有效，您可以发送新的授权码；',
   `如需重新授权，请再次发送「${LXNS_BIND_CMD()}」。`,
 ].join('\n')
+/**
+ * 404 且 apiMessage 表明「玩家档案不存在」：OAuth 授权本身成功、授权码也被消费，
+ * 只是该落雪账号下从未绑定过 maimai 玩家数据——与「授权码失效」是完全不同的处置路径
+ * （先去落雪侧绑玩家，再重新拿新授权链接），不能共用 OAUTH_FAILED_MSG 误导用户重发旧码。
+ */
+const LXNS_NO_PLAYER_MSG = () => [
+  '落雪绑定失败：您的落雪账号下还没有 maimai 玩家数据。',
+  '请先登录 maimai.lxns.net 绑定玩家（好友码），确认能看到自己的成绩后，',
+  `再重新发送「${LXNS_BIND_CMD()}」获取新的授权链接完成绑定。`,
+].join('\n')
 const BINDING_TEMPORARY_FAILED_MSG = [
   '落雪绑定暂时失败：网络、响应数据或本地数据库出现异常。',
   '当前绑定会话仍有效，您可以稍后重新发送授权码；',
@@ -326,8 +336,19 @@ export function divingfishAuthorizeMsg(cfg, authorization) {
   ].join('\n')
 }
 
-/** 绑定失败两档分类（源 complete_lxns_binding except 分支）；导出供单测锁值 */
+/**
+ * 绑定失败分类（源 complete_lxns_binding except 分支）；导出供单测锁值
+ * 落雪同一状态码多义，按 apiMessage 细分（先例：lib/handlerError.js 的 `score not found`）：
+ * - 404 `player not found` → 落雪账号下没有玩家档案，引导先去落雪绑定玩家数据
+ * - 其余 HTTP 族（含未识别 apiMessage 的 404）→ 授权码已用/过期档
+ * - 网络/落库等未知异常 → 暂时失败档
+ */
 export function classifyBindError(error) {
+  // apiMessage 原文以日志实测为准（小写归一，防落雪侧大小写变化）
+  if (error instanceof LXNSNotFoundError
+    && String(error.apiMessage || '').toLowerCase() === 'player not found') {
+    return LXNS_NO_PLAYER_MSG()
+  }
   const httpFamily = [LXNSTokenError, LXNSOAuthError, LXNSParamsError,
     LXNSPermissionDeniedError, LXNSNotFoundError, LXNSTooManyRequestsError]
   return httpFamily.some(cls => error instanceof cls)
@@ -515,7 +536,14 @@ export class MaiBind extends MaiPlugin {
       this.finish('waitLxnsCode')
       await this.reply(`${result}\n${await settleAuthMessages(e, { success: true })}`, true)
     } catch (error) {
-      logger.warn(`[mai-plugin] 落雪绑定失败：${error?.stack || error}`)
+      // _handleError 已把 status/url/apiMessage 挂到错误对象上（lib/client/lxns.js），只打 stack 会丢掉；
+      // apiMessage 是落雪返回的原文，落雪同一状态码多义（404 可能是玩家档案缺失也可能是授权码失效），排障靠它
+      const label = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      const diag = ['status', 'url', 'apiMessage']
+        .filter(k => error?.[k] != null)
+        .map(k => `${k}=${error[k]}`)
+        .join(' ')
+      logger.warn(`[mai-plugin] 落雪绑定失败：${label}${diag ? ` ${diag}` : ''}\n${error?.stack || ''}`)
       await this.reply(`${classifyBindError(error)}\n${await settleAuthMessages(e)}`, true)
       this.setContext('waitLxnsCode', false, 600, LXNS_TIMEOUT_MSG())
     }

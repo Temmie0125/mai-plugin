@@ -230,10 +230,11 @@ test('models：source/theme 索引映射与帮助文本', async () => {
   assert.match(themeHelp(), /「0」：prism_plus\n「1」：circle/)
 })
 
-// ---- bind 规则与两档错误分类（apps/bind.js）----
+// ---- bind 规则与绑定错误三档分类（apps/bind.js）----
 test('bind 规则：命中/拒收样例', async () => {
   const { MaiBind, classifyBindError } = await import('../apps/bind.js')
-  const { LXNSOAuthError, LXNSTooManyRequestsError } = await import('../lib/client/errors.js')
+  const { LXNSOAuthError, LXNSTooManyRequestsError, LXNSNotFoundError } =
+    await import('../lib/client/errors.js')
   const { ApiError } = await import('../lib/client/errors.js')
   const { UnknownError } = await import('../lib/client/errors.js')
 
@@ -256,9 +257,18 @@ test('bind 规则：命中/拒收样例', async () => {
   for (const msg of ['#mai bind qq 114514', '#mai 绑定QQ 114514', '#mai bind qq', '#mai 绑定qq 1']) {
     assert.deepEqual(hit(msg), ['bindQqCmd'], `应命中 bindQqCmd：${msg}`)
   }
-  // 两档分类：落雪 HTTP 族 → 一档；网络/未知 → 二档
+  // 三档分类：落雪 HTTP 族 → 一档；404 且 apiMessage 为玩家档案缺失 → 引导去落雪绑玩家；网络/未知 → 二档
   assert.match(classifyBindError(new LXNSOAuthError()), /授权码可能已使用、已过期/)
   assert.match(classifyBindError(new LXNSTooManyRequestsError()), /授权码可能已使用、已过期/)
+  // 404 细分：OAuth 授权成功但落雪账号下无 maimai 玩家档案（apiMessage 原文以日志实测为准，匹配做小写归一）
+  const noPlayer = new LXNSNotFoundError()
+  noPlayer.apiMessage = 'player not found'
+  assert.match(classifyBindError(noPlayer), /maimai 玩家数据/)
+  const noPlayerUpper = new LXNSNotFoundError()
+  noPlayerUpper.apiMessage = 'Player Not Found'
+  assert.match(classifyBindError(noPlayerUpper), /maimai 玩家数据/, 'apiMessage 大小写不敏感')
+  // 未识别 apiMessage 的 404（如 score not found 之外的其它 404）→ 维持授权码失效档
+  assert.match(classifyBindError(new LXNSNotFoundError()), /授权码可能已使用、已过期/)
   assert.match(classifyBindError(new ApiError('网络请求失败')), /暂时失败/)
   assert.match(classifyBindError(new UnknownError()), /暂时失败/)
   assert.match(classifyBindError(new Error('写盘失败')), /暂时失败/)
