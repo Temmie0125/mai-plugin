@@ -404,6 +404,27 @@ test('回归：别名合并 LXNS 宴谱 id（≥100000）不再偏移（源 bc19
   assert.equal(merged.byId(11001)[0].alias[0], '边界 DX', '边界值 1001 偏移为 11001')
 })
 
+test('回归：落雪行按曲库 knownIds 挂载，SD-only 曲不再偏移出孤儿行', () => {
+  // 生产实测「#mai fsline 紫后潘」：SD-only 曲 1819 AFTER PANDORA 被盲偏移出曲库
+  // 不存在的 11819 孤儿行，把唯一命中撑成多候选。给 knownIds 后按实际变体挂载。
+  const lxns = { aliases: [
+    { song_id: 1819, aliases: ['后潘'] },       // SD-only：曲库只有 1819
+    { song_id: 1102, aliases: ['封焰'] },       // DX 独有：曲库只有 11102
+    { song_id: 1500, aliases: ['双谱'] },       // SD+DX 双行（id>1000 才进变体逻辑）：两个变体都挂
+    { song_id: 99998, aliases: ['查无此曲'] },  // 两变体都不在：丢弃（孤儿行只会虚增计数）
+  ] }
+  const knownIds = new Set([1819, 11102, 1500, 11500])
+  const merged = mergeAliasData({ yuzuAliases: [], lxnsAliases: lxns, knownIds })
+
+  assert.equal(merged.byId(1819)[0].alias[0], '后潘', 'SD-only 曲挂原 id（顺带修复：落雪别名曾整体挂上幽灵行而查不到）')
+  assert.deepEqual(merged.byId(11819), [], '不得再产出孤儿行 11819')
+  assert.equal(merged.byId(11102)[0].alias[0], '封焰', 'DX 独有曲仍 +10000 挂载')
+  assert.equal(merged.byId(1500)[0].alias[0], '双谱', 'SD 变体挂载')
+  assert.equal(merged.byId(11500)[0].alias[0], '双谱', 'DX 变体也挂载（SD/DX 是不同谱面，留给多选让用户挑）')
+  assert.deepEqual(merged.byId(99998), [], '曲库两变体皆无 → 行丢弃')
+  assert.deepEqual(merged.byId(109998), [])
+})
+
 test('成绩转换：DF/LXNS → PlayedResult / Best50', () => {
   // DF 单曲（dev/player/record 响应形态）
   const dfRecord = [{ song_id: 8, title: 'True Love Song', level: '7', level_index: 1, achievements: 99.1234, fc: 'ap', fs: 'fs', rate: 'sss', dxScore: 200, ra: 180, ds: 7.0, type: 'SD', level_label: '7' }]

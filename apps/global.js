@@ -151,7 +151,7 @@ export class MaiGlobal extends MaiPlugin {
       return true
     }
     if (found.multi) {
-      awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
+      awaitPickSong(this, e, found.multi, async (song) => {
         await this.sendGlobal(song, levelIndex)
       })
       return true
@@ -221,7 +221,7 @@ export class MaiGlobal extends MaiPlugin {
       return true
     }
     if (found.multi) {
-      awaitPickSong(this, e, found.multi.map(a => mai.totalList.byId(a.song_id)).filter(Boolean), async (song) => {
+      awaitPickSong(this, e, found.multi, async (song) => {
         await this.sendFsline(song, levelIndex, line)
       })
       return true
