@@ -222,10 +222,10 @@ test('护栏④（源码级）：writeB50 的调用点全仓唯一，且在 hand
   assert.ok(writeHits[0].startsWith('lib/handler.js:'),
     `唯一写点应在 lib/handler.js，实际：${writeHits[0]}`)
 
-  // 调用点白名单：新增第 6 个调用方时必须回来复核它是不是「真实 B50」，
+  // 调用点白名单：新增调用方时必须回来复核它是不是「真实 B50」，
   // 因此这条**故意**是计数断言 —— 它失败即为提醒，不是回归。
-  assert.equal(withCacheHits.length, 5,
-    `写入口调用点应为 5 处（drawBest50 / updatePlayerCache / getMaiWhat / drawRiseScoreList / getB50ForCalc），`
+  assert.equal(withCacheHits.length, 6,
+    `写入口调用点应为 6 处（drawBest50 / updatePlayerCache / getMaiWhat / drawRiseScoreList / getB50ForCalc / drawSuggest），`
     + `实际 ${withCacheHits.length} 处：${JSON.stringify(withCacheHits)}。`
     + '新增调用方前请确认它拉取的是无任何限定条件的真实 B50。')
 })
@@ -281,13 +281,14 @@ test('消费方切换锁（源码级）：records 消费方一律走 cached，�
     + '。表族消费方一律走 getPlayerResultCached（每日本地缓存），勿改回实时直拉。')
 
   // 计数式绊线：新增 records 消费方时回来确认它是否也该走缓存
-  // 12 处 = §5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache
+  // 13 处 = §5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache
   //       + 随心配家族 3 个（drawVariantBest50 / drawSong50 / drawFilteredScoreList）
   //       + getAp50（水鱼 AP50 与「落雪接口失败回退」**共用**这一条本地管线，故只此一处）
+  //       + drawSuggest（推分建议：五档分带要查每张谱面的当前达成率）
   //       见《b50扩展实现设计.md》§6/§9——全部是只读消费方，无一写盘
-  assert.equal(cached.length, 12,
-    `getPlayerResultCached 调用点应为 12 处（§5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache`
-    + ` + 随心配的 3 个 + getAp50），实际 ${cached.length} 处：${JSON.stringify(cached)}`)
+  assert.equal(cached.length, 13,
+    `getPlayerResultCached 调用点应为 13 处（§5.5 的 6 个表族消费方 + getFitBest50 + updatePlayerCache`
+    + ` + 随心配的 3 个 + getAp50 + drawSuggest），实际 ${cached.length} 处：${JSON.stringify(cached)}`)
 })
 
 // ---------------------------------------------------------------- AP50（接口优先 / 失败回退）
