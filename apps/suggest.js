@@ -1,9 +1,11 @@
 /**
  * #mai suggest —— 推分建议（docs/推分建议.md）
  *
- * 五个达成率档位（进度分带）各推荐 5 张谱面；候选池为文档口径的推荐定数区间
- * （由 Rating 推算），推荐度二选一：平均达成率（默认）/ 定数差值（定数|差值|diff）。
- * 目标 Rating 可选（正整数，默认当前），需 ≥ 当前 Rating。
+ * 五个达成率目标档位（100.5/100.0/99.5/99.0/98.5）各推荐 5 张谱面；候选为各档
+ * 推荐定数窗口内的**全部谱面**（玩过 + 未玩，排除宴谱/新歌），窗口由阈值 Rating
+ * 推算（缺省 = 当前 Rating 向上取整到下一 500 档），目标每降一档窗口上移 0.5 定数。
+ * 推荐度二选一：定数差值（默认）/ 平均达成率（`平均` 切换）。
+ * 阈值 Rating 参数须 ≥ 当前 Rating。
  * 算法在 lib/suggest.js（纯函数），编排在 lib/handler.js drawSuggest。
  */
 import { MaiPlugin } from '../lib/qqbot.js'
@@ -16,7 +18,7 @@ import { parseSuggestArgs, suggestUsage, suggestArgError, suggestRatingError } f
 
 const H = () => head()
 
-/** `#mai suggest [平均|定数] [目标Rating]`；capture 1 = 参数串（无参也命中，默认口径直接出） */
+/** `#mai suggest [平均|定数] [阈值Rating]`；capture 1 = 参数串（无参也命中，默认口径直接出） */
 const REG_SUGGEST = () => new RegExp(`^[#/]${H()}\\s*(?:suggest)(?:\\s+(.+))?$`)
 
 /** #mai suggest —— 推分建议 */

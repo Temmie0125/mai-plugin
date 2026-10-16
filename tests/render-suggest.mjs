@@ -33,7 +33,7 @@ if (!global.redis) {
 }
 
 const { mai } = await import('../lib/service.js')
-const { buildSuggestList, averageDsRange } = await import('../lib/suggest.js')
+const { buildSuggestList, thresholdBaseDs } = await import('../lib/suggest.js')
 const { suggestView } = await import('../lib/render/views.js')
 const { renderSuggest } = await import('../lib/render/picmodle.js')
 const { computeRating } = await import('../lib/calc.js')
@@ -47,19 +47,22 @@ if (!mai.ready) {
   process.exit(1)
 }
 
-/** 目标 Rating 14500（平均定数 12.9，区间 12.9~13.4） */
-const RATING = 14500
-const dsRange = averageDsRange(RATING)
-console.log('  · 定数区间:', JSON.stringify(dsRange))
+/** 当前 Rating 12500 → 默认阈值 13000（baseDs 11.6，五档窗口覆盖 [11.3, 13.1)） */
+const RATING = 12500
+const threshold = (Math.floor(RATING / 500) + 1) * 500
+const baseDs = thresholdBaseDs(threshold)
+const loDs = baseDs - 0.3
+const hiDs = baseDs + 1.7
+console.log('  · 阈值:', threshold, '· baseDs:', baseDs, '· 窗口联合覆盖:', loDs, '~', hiDs)
 
-/** 区间内按难度取候选，按序循环铺五种达成率形态 + 已鸟加 + 留空（未玩） */
+/** 区间内按难度取候选（排除新歌/宴谱，与算法口径一致），按序循环铺达成率形态 + 已鸟加 + 留空（未玩） */
 const BANDS = [100.2, 99.8, 99.2, 98.7, 97.0, 100.5, null]
 function makeRecords() {
   const cands = []
   for (const s of mai.totalList.root) {
-    if (s.song_id >= 100000) continue
+    if (s.song_id >= 100000 || s.isnew) continue
     for (const d of s.difficulties) {
-      if (d && d.level_value >= dsRange.min && d.level_value <= dsRange.max) cands.push([s, d])
+      if (d && d.level_value >= loDs && d.level_value < hiDs) cands.push([s, d])
     }
   }
   cands.sort((a, b) => a[0].song_id - b[0].song_id || a[1].level_index - b[1].level_index)
@@ -93,12 +96,12 @@ async function shot(name, result) {
   return true
 }
 
-for (const mode of ['avg', 'diff']) {
-  const built = buildSuggestList({ totalList: mai.totalList, records, mode, dsRange })
-  const filled = built.tiers.map(t => `${t.tier}:${t.rows.length}`).join(' ')
-  console.log(`  · mode=${mode} 各档条数: ${filled}`)
+for (const mode of ['diff', 'avg']) {
+  const built = buildSuggestList({ totalList: mai.totalList, records, mode, thresholdRating: threshold })
+  const filled = built.tiers.map(t => `${t.tier}:${t.lo / 10}~${(t.hi - 1) / 10}(${t.rows.length})`).join(' ')
+  console.log(`  · mode=${mode} 各档窗口(条数): ${filled}`)
   const view = suggestView({
-    tiers: built.tiers, mode, dsRange, currentRating: RATING, targetRating: RATING,
+    tiers: built.tiers, mode, currentRating: RATING, thresholdRating: threshold,
     serviceName: 'Diving-Fish', botName: 'MaiTest',
   })
   if (!await shot(`suggest-${mode}`, await renderSuggest(view))) process.exit(1)

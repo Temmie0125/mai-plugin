@@ -57,8 +57,9 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #   rand 定数支持字面/小数/区间：rand 13 / rand 14.9 / rand 13-14（口语「随个」同）
 #   游戏进行中：开 <一个字符> 翻开所有该字符 · #mai tips 提示 · #mai ans 答案 · guess on|off|reset 群开关
 #   com|calc|计算：单曲 Rating 计算器（免绑定），如 #mai calc 13.6 100.5
-#mai suggest [平均|定数] [目标Rating] —— 推分建议：五个达成率档位(100.5/100.0/99.5/99.0/98.5)各推 5 张
-#   默认按全服平均达成率推荐；「定数」按官方定数与拟合定数差值推荐；目标 Rating 缺省取当前（@他人可查对方）
+#mai suggest [平均|定数] [阈值Rating] —— 推分建议：五个达成率目标档位各推 5 张（含未玩谱面，排除新歌）
+#   默认按定数差值(官方−拟合定数)推荐；「平均」按全服平均达成率；各档定数窗口宽 1.0、每降一档上移 0.2
+#   阈值 Rating 缺省取当前向上取整到下一 500 档(12500→13000)，用于推算各档窗口（@他人可查对方）
 #mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票
 #   / alias local <ID> <别名> 本地别名 / alias sync 更新别名库
 #mai push on|off 群别名推送开关 / push global on|off 全局（仅主人）
