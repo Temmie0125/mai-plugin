@@ -15,7 +15,7 @@ import { MaiPlugin } from '../lib/qqbot.js'
 import Config, { head } from '../lib/config.js'
 import * as database from '../lib/database.js'
 import { getUserAndAuth, effectiveService } from '../lib/user.js'
-import { bindLxns, bindDivingfish, completeDivingfishBinding, bindFriendCode, DF_QQ_HINT } from '../lib/handler.js'
+import { bindLxns, bindDivingfish, completeDivingfishBinding, bindFriendCode } from '../lib/handler.js'
 import { botName } from '../lib/render/picmodle.js'
 import {
   buildAuthorizeUrl, extractAuthorizationCode, isBindingChannelAllowed,
@@ -159,6 +159,16 @@ export function classifyBindFcError(error) {
 
 const DIVINGFISH_OAUTH_ERROR = 'BOT管理员尚未配置水鱼查分器 OAuth 应用，无法进行绑定授权。'
 const DIVINGFISH_BIND_FAILED_MSG = '发起水鱼授权失败：水鱼账号服务可能暂时不可用，请稍后再试。'
+
+/**
+ * 水鱼授权缺游戏 QQ（官方QQBot openid 环境未 bind qq）时的引导。
+ * 刻意不用查询侧总引导 DF_QQ_HINT：此处已在绑定流程内，直接给「补 QQ → 重新授权」
+ * 两步；也避免与 QQBot 的「绑定水鱼」指引按钮互相打转（点了按钮又回总引导）。
+ */
+const DF_BIND_NEED_QQ = () =>
+  '当前环境读不到 QQ 号，水鱼授权需先补充游戏 QQ 作为绑定标识。\n'
+    + `※ 发送「#${H()} bind qq <你的QQ号>」（仅存本插件本地，不会发给水鱼），`
+    + `再重新发送「#${H()} bind df」完成授权。`
 
 /** 水鱼绑定指令展示名（文案内指路统一走它；实际两种写法都可触发） */
 const DF_BIND_CMD = () => `#${H()} bind df`
@@ -426,8 +436,8 @@ export class MaiBind extends MaiPlugin {
     const got = await getUserAndAuth(e, { autoCreate: true, allowAt: false })
     if (!got) return true
     if (!Number.isInteger(got.user.qqid) || got.user.qqid <= 0) {
-      // 官方QQBot(openid)环境无水鱼所需的 QQ 号
-      await this.reply(DF_QQ_HINT(), true)
+      // 官方QQBot(openid)环境无水鱼授权所需的游戏 QQ（绑定标识）
+      await this.reply(DF_BIND_NEED_QQ(), true)
       return true
     }
     try {
@@ -561,7 +571,7 @@ export class MaiBind extends MaiPlugin {
     this.finish('waitLxnsCode')
     if (!Number.isInteger(got.user.qqid) || got.user.qqid <= 0) {
       this.finish('waitDfCode')
-      await this.reply(DF_QQ_HINT(), true)
+      await this.reply(DF_BIND_NEED_QQ(), true)
       return true
     }
     try {

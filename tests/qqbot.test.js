@@ -17,9 +17,9 @@ if (!global.logger) {
   })
 }
 
-const { isQQBot, hasImage, breakAroundImages, buttonSegment, stripBizHint, MaiPlugin } =
+const { isQQBot, hasImage, breakAroundImages, buttonSegment, stripBizHint, hasExactText, MaiPlugin } =
   await import('../lib/qqbot.js')
-const { MESSAGE } = await import('../lib/handler.js')
+const { MESSAGE, DF_QQ_HINT } = await import('../lib/handler.js')
 const Config = (await import('../lib/config.js')).default
 
 // ===== 桩：segment 与配置 =====
@@ -157,6 +157,15 @@ test('buttonSegment：chart 场景 {id} 按歌曲 id 预填，无 id 时留空',
   assert.ok(buttonSegment({ name: 'b50', songId: 1150 }).data.flat().every(b => !b.input.includes('1150')))
 })
 
+test('buttonSegment：bind 预设=绑定水鱼/绑定落雪，完整命令、仅预填不自动发送', () => {
+  stubSegment()
+  const flat = buttonSegment('bind').data.flat()
+  assert.deepEqual(flat.map(b => b.text), ['绑定水鱼', '绑定落雪'])
+  assert.deepEqual(flat.map(b => b.input), ['#mai bind df', '#mai bind lxns'])
+  // 刻意不设 send/callback：与全部预设同口径，点击仅预填输入框
+  assert.ok(flat.every(b => b.send === undefined && b.callback === undefined))
+})
+
 test('buttonSegment：宿主无 segment.button 时返回 null', () => {
   globalThis.segment = {}
   assert.equal(buttonSegment('image'), null)
@@ -180,6 +189,17 @@ test('stripBizHint：只撤 MESSAGE() 提示附言，其他文本与统计文本
   // 纯字符串载荷与「撤空防御」：全被撤时保持原样
   assert.equal(stripBizHint('纯文本', MESSAGE()), '纯文本')
   assert.deepEqual(stripBizHint([MESSAGE()], MESSAGE()), [MESSAGE()])
+})
+
+// ===== hasExactText / 未绑定引导换钮判定 =====
+
+test('hasExactText：string / text 段 / 数组逐字匹配，容忍前导换行', () => {
+  assert.equal(hasExactText(DF_QQ_HINT(), DF_QQ_HINT()), true)
+  assert.equal(hasExactText([IMG, `\n${DF_QQ_HINT()}`], DF_QQ_HINT()), true)
+  assert.equal(hasExactText([{ type: 'text', text: DF_QQ_HINT() }], DF_QQ_HINT()), true)
+  assert.equal(hasExactText('其他错误文本', DF_QQ_HINT()), false)
+  assert.equal(hasExactText(`${DF_QQ_HINT()}（多余后缀）`, DF_QQ_HINT()), false)
+  assert.equal(hasExactText(Buffer.from('x'), DF_QQ_HINT()), false)
 })
 
 // ===== MaiPlugin.reply =====
@@ -296,6 +316,38 @@ test('reply：data.qqBtn 场景预设（纯文本载荷也按场景附按钮）'
     assert.equal(msg.at(-1).type, 'button')
     const rows = msg.at(-1).data
     assert.ok(rows.flat().some(b => b.input.includes('拟合b50')))
+  } finally {
+    restore()
+  }
+})
+
+test('reply：载荷为未绑定引导时一键换绑定指引按钮（覆盖显式 b50 场景与无场景纯文本）', async () => {
+  stubSegment()
+  const restore = stubConfig({ quoteReply: true, qqBotButtons: true })
+  try {
+    const inputs = ['#mai bind df', '#mai bind lxns']
+    // b50 家族显式 qqBtn:'b50' → 引导文本命中，换成 bind 组
+    const { p, sent } = makePlugin({ adapter_name: 'QQBot' })
+    await p.reply(DF_QQ_HINT(), true, { qqBtn: 'b50' })
+    assert.deepEqual(sent[0][0].at(-1).data.flat().map(b => b.input), inputs)
+
+    // bind 命令层直接回引导文本（无场景纯文本）→ 同样获得 bind 组
+    const p2 = makePlugin({ adapter_name: 'QQBot' })
+    await p2.p.reply(DF_QQ_HINT(), true)
+    assert.deepEqual(p2.sent[0][0].at(-1).data.flat().map(b => b.input), inputs)
+
+    // text 段形态（toSegment 包装等）→ 仍识别
+    const p3 = makePlugin({ adapter_name: 'QQBot' })
+    await p3.p.reply([{ type: 'text', text: DF_QQ_HINT() }], true, { qqBtn: 'b50' })
+    assert.deepEqual(p3.sent[0][0].at(-1).data.flat().map(b => b.input), inputs)
+
+    // 其他文本不受影响：显式 b50 场景保持 b50 组；无场景纯文本仍不附按钮
+    const p4 = makePlugin({ adapter_name: 'QQBot' })
+    await p4.p.reply('查询失败：示例错误', true, { qqBtn: 'b50' })
+    assert.ok(p4.sent[0][0].at(-1).data.flat().some(b => b.input.includes('拟合b50')))
+    const p5 = makePlugin({ adapter_name: 'QQBot' })
+    await p5.p.reply('普通错误文本', true)
+    assert.equal(typeof p5.sent[0][0], 'string', '无场景纯文本不附按钮')
   } finally {
     restore()
   }
