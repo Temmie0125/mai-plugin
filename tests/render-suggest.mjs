@@ -52,7 +52,7 @@ const RATING = 12500
 const threshold = (Math.floor(RATING / 500) + 1) * 500
 const baseDs = thresholdBaseDs(threshold)
 const loDs = baseDs - 0.3
-const hiDs = baseDs + 1.7
+const hiDs = baseDs + 1.2
 console.log('  · 阈值:', threshold, '· baseDs:', baseDs, '· 窗口联合覆盖:', loDs, '~', hiDs)
 
 /** 区间内按难度取候选（排除新歌/宴谱，与算法口径一致），按序循环铺达成率形态 + 已鸟加 + 留空（未玩） */
