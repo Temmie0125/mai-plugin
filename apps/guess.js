@@ -20,6 +20,7 @@ import {
   startTextGame, startPicGame, finishCorrect, finishGame, endGame, isPlaying, isCorrect,
   getGuessPool, gameOf, startLetterGame, openLetter, tipLetter, answerLetter, letterBoardText,
 } from '../lib/guess.js'
+import { parseFibArgs, buildFibPool, startFibGame, guessFib, fibBanner, fibUsage } from '../lib/fib.js'
 
 const H = () => head()
 
@@ -35,6 +36,11 @@ const REG_LETTER = () => new RegExp(`^[#/]${H()}\\s*(?:letter|ltr|开字母)\\s*
 const REG_OPEN = () => new RegExp(`^[#/](?:${H()}\\s*)?(?:open|翻开|打开|揭开|出|开)\\s*([^\\s])\\s*$`)
 /** 随机翻开一个字符（对齐 phi 的 `getTip`；tips/tip 两种拼法都收） */
 const REG_TIPS = () => new RegExp(`^[#/]${H()}\\s*(?:tips?|提示)\\s*$`)
+/**
+ * 弗一把：`#mai fib 红12+` / `#mai 弗一把 白12.5-14`，参数段交 parseFibArgs 细析。
+ * 空格可省（phi 同款 `fib14.3` 形态）；粘连的非法参数会走到用法提示而非静默
+ */
+const REG_FIB = () => new RegExp(`^[#/]${H()}\\s*(?:fib|弗一把)(?:\\s*(.+))?$`)
 /** 通用结束（三类游戏通吃）；权限在 handler 内判——不能用 permission，否则发起者被规则层拦死 */
 const REG_ANS = () => new RegExp(`^[#/]${H()}\\s*(?:ans|答案)\\s*$`)
 /** 答题兜底：免前缀、匹配一切，仅当该群在游戏中才消费（priority 200，见 MaiGuessAnswer） */
@@ -48,11 +54,11 @@ const isGroupAdmin = e => Boolean(e.isMaster || e.member?.is_owner || e.member?.
 /** 展示名（板面上标猜中者用） */
 const displayName = e => String(e.sender?.card || e.sender?.nickname || e.user_id || '')
 
-/** 该群已在进行的游戏类型 → 统一文案（源只提两类，第三类落地后必然失真，已登记） */
-const busyHint = () => `该群已有正在进行的游戏（猜歌/猜曲绘/开字母），可发 #${H()} ans 结束或等它超时`
+/** 该群已在进行的游戏类型 → 统一文案（源只提两类，后续游戏落地后逐个补名） */
+const busyHint = () => `该群已有正在进行的游戏（猜歌/猜曲绘/开字母/弗一把），可发 #${H()} ans 结束或等它超时`
 
-/** 群开关未开时的引导（源原文是「开启请输入 开启mai猜歌」；收编为子命令后改为本插件语法，已登记） */
-const disabledHint = () => `该群已关闭猜歌功能，开启请输入 #${head()} guess on`
+/** 群开关未开时的引导（开关为四类游戏共用，文案按「群游戏」表述） */
+const disabledHint = () => `该群已关闭群游戏功能，开启请输入 #${head()} guess on`
 
 /** 揭晓卡载荷（源 `draw_chart_info(song)` + MESSAGE；失败时降级为文案） */
 async function cardPayload(song) {
@@ -78,6 +84,7 @@ export class MaiGuess extends MaiPlugin {
         // 起手必须声明在 REG_OPEN 之前：`#mai 开字母` 两条都不冲突（见 REG_OPEN 注释），
         // 但顺序仍是「先起手、后动作」的自然读法
         { reg: REG_LETTER().source, fnc: 'startLetter' },
+        { reg: REG_FIB().source, fnc: 'startFib' },
         { reg: REG_OPEN().source, fnc: 'open' },
         { reg: REG_TIPS().source, fnc: 'tips' },
         { reg: REG_ANS().source, fnc: 'ans' },
@@ -139,6 +146,49 @@ export class MaiGuess extends MaiPlugin {
       await this.reply('该群没有正在进行的开字母', true)
       return true
     }
+    return true
+  }
+
+  /**
+   * #mai fib / 弗一把 —— 抽谜底谱面（lib/fib.js），守卫与猜歌同款四重
+   * 参数形态见 parseFibArgs：`fib 红12+` / `fib 白12.5-14` / `fib`（紫谱全定数）
+   */
+  async startFib(e) {
+    if (!e.isGroup) {
+      await this.reply('弗一把是群内游戏，请在群聊中发起。', true)
+      return true
+    }
+    if (!(await ensureReady(e))) return true
+    const gid = e.group_id
+    if (!database.getGroup(gid).guess) {
+      await this.reply(disabledHint(), true)
+      return true
+    }
+    if (isPlaying(gid)) {
+      await this.reply(busyHint(), true)
+      return true
+    }
+    const args = parseFibArgs(((e.msg.match(REG_FIB()) || [])[1] || '').trim())
+    if (!args) {
+      await this.reply(fibUsage(), true)
+      return true
+    }
+    const pool = buildFibPool(args.levelIndex, args.min, args.max)
+    if (!pool.length) {
+      await this.reply('该范围内没有谱面，换个条件试试。', true)
+      return true
+    }
+    const answer = pool[Math.floor(Math.random() * pool.length)]
+    const game = startFibGame(gid, {
+      answer,
+      levelIndex: args.levelIndex,
+      min: args.min,
+      max: args.max,
+      send: msg => this.reply(msg, true),
+      starter: e.user_id,
+      starterName: displayName(e),
+    })
+    await this.reply(fibBanner(game), true)
     return true
   }
 
@@ -261,12 +311,13 @@ export class MaiGuessAnswer extends MaiPlugin {
   }
 
   /**
-   * 答题兜底（三类游戏共用一条规则）
+   * 答题兜底（源 `on_message(rule=is_now_playing_guess_music)`）
    *
-   * 猜歌/猜曲绘与开字母的「直接发答案」语义不同，但**必须共用同一条 `^.*$` 规则**——
+   * 猜歌/猜曲绘、开字母与弗一把的「直接发答案」语义不同，但**必须共用同一条 `^.*$` 规则**——
    * 两条兜底规则会互相抢消息。故这里按对局类型分流：
    * - 猜歌/猜曲绘：答对即揭晓并收尾（源 `mai_guess.py:117-129`）
    * - 开字母：答对只判该行，可继续开字母 / 猜其余行
+   * - 弗一把：整条消息交给 guessFib 解析（对得上曲库曲目即算一猜，出对比表）
    * 未命中一律 `return false` 放行（不吞无关聊天）。
    */
   async onAnswer(e) {
@@ -276,6 +327,10 @@ export class MaiGuessAnswer extends MaiPlugin {
     if (gameOf(gid)?.type === 'letter') {
       // 答错静默（与猜歌一致）；命中则由 lib 自行发送板面更新
       return (await answerLetter(gid, e.msg, displayName(e)))?.kind !== 'miss'
+    }
+
+    if (gameOf(gid)?.type === 'fib') {
+      return guessFib(gid, e.msg, displayName(e), e.user_id)
     }
 
     if (!isCorrect(gid, e.msg)) return false

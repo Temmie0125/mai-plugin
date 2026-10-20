@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!-- 弗一把（fib）对比表 —— 版式参照 phi-plugin frib19：深色卡片 + 七列状态表格。
+     数据由 lib/fib.js:buildFibView 组装（rows/answerRow 的 cells 顺序固定，见 FIB_COLUMNS）。
+     渲染器截 #container；背景衬最近一次猜测的曲绘（blur 压暗，绝不放谜底曲绘）。 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif; }
+    #container {
+      position: relative;
+      width: 1180px;
+      padding: 26px 28px 20px;
+      background: linear-gradient(160deg, #16131f 0%, #221b31 58%, #191624 100%);
+      color: #ecebf3;
+      overflow: hidden;
+    }
+    .bg { position: absolute; inset: 0; z-index: 0; }
+    .bg img {
+      width: 100%; height: 100%; object-fit: cover;
+      filter: blur(26px) brightness(0.3) saturate(1.15);
+      transform: scale(1.15);
+    }
+    .inner { position: relative; z-index: 1; }
+
+    .titleRow { display: flex; align-items: center; margin-bottom: 16px; }
+    .title .main { font-size: 34px; font-weight: 700; letter-spacing: 2px; }
+    .title .sub { font-size: 15px; opacity: 0.62; margin-top: 3px; }
+    .levelBox { margin-left: auto; text-align: center; }
+    .levelTag {
+      display: inline-block; padding: 5px 18px; border-radius: 8px;
+      font-size: 20px; font-weight: 700; color: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    }
+    .levelTag.basic { background: #3f9e4d; }
+    .levelTag.advanced { background: #c2961f; }
+    .levelTag.expert { background: #cc4646; }
+    .levelTag.master { background: #8d53c5; }
+    .levelTag.remaster { background: linear-gradient(135deg, #8d53c5 0%, #cfc8e6 100%); }
+    .rangeDesc { font-size: 13px; opacity: 0.66; margin-top: 5px; }
+    .roundBox { text-align: right; margin-left: 26px; min-width: 118px; }
+    .roundNum { font-size: 32px; font-weight: 700; line-height: 1.1; }
+    .roundMax { font-size: 15px; opacity: 0.6; }
+
+    .tableBox { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 10px 12px; }
+    .dataRow { display: flex; align-items: stretch; border-radius: 8px; margin: 4px 0; }
+    .headRow { background: rgba(255,255,255,0.075); font-size: 14px; color: #cfcfe0; }
+    .headRow .cell { padding: 8px 5px; }
+    .cell {
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 9px 5px; min-width: 0; text-align: center; border-radius: 8px;
+      font-size: 15px; line-height: 1.25;
+    }
+    .state-same { background: rgba(97, 218, 130, 0.34); }
+    .state-near { background: rgba(255, 205, 84, 0.36); }
+    .state-diff { background: rgba(255,255,255,0.055); }
+    .state-unknown { background: rgba(255,255,255,0.028); color: rgba(236,235,243,0.42); }
+    .state-unknown .arrow { visibility: hidden; }
+
+    .playerCell { flex: 0 0 84px; font-size: 13px; overflow-wrap: anywhere; }
+    .songCell { flex: 0 0 236px; text-align: left; padding-left: 10px; font-weight: 600; }
+    .charterCell { flex: 1.45; }
+    .versionCell { flex: 1.5; }
+    .genreCell { flex: 1.1; }
+    .typeCell { flex: 0.55; }
+    .dsCell, .bpmCell, .notesCell { flex: 0.62; font-variant-numeric: tabular-nums; }
+
+    .cellMain { display: flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; }
+    .songCell .cellMain { justify-content: flex-start; }
+    .cellValue { min-width: 0; overflow-wrap: anywhere; }
+    .arrow { flex: 0 0 auto; font-size: 15px; font-weight: 700; }
+    .arrow.up { color: #7ef0a2; }
+    .arrow.down { color: #ff9d9d; }
+    .arrow.ok { color: #aef5c5; }
+    .cellSub { font-size: 11.5px; opacity: 0.72; margin-top: 2px; }
+
+    .rowHit { outline: 2px solid rgba(97, 218, 130, 0.9); background: rgba(97, 218, 130, 0.08); }
+    .rowAnswer { outline: 2px solid rgba(180, 122, 255, 0.85); background: rgba(180, 122, 255, 0.1); }
+    .answerTag { color: #d9bfff; font-weight: 700; }
+
+    .legendRow { display: flex; align-items: center; gap: 16px; margin: 14px 6px 8px; font-size: 13px; opacity: 0.85; flex-wrap: wrap; }
+    .legendItem { display: flex; align-items: center; gap: 6px; }
+    .legendBox {
+      width: 22px; height: 16px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff;
+    }
+    .legendArrow { font-weight: 700; }
+
+    .tipsRow { margin: 2px 6px; font-size: 12.5px; opacity: 0.58; line-height: 1.7; }
+    .footerRow { margin-top: 12px; text-align: right; font-size: 12px; opacity: 0.4; }
+  </style>
+</head>
+<body>
+<div id="container">
+  {{if bgCover}}<div class="bg"><img src="{{bgCover}}"></div>{{/if}}
+  <div class="inner">
+    <div class="titleRow">
+      <div class="title">
+        <p class="main">maimai FIB</p>
+        <p class="sub">Guess the Chart · 弗一把</p>
+      </div>
+      <div class="levelBox">
+        <div class="levelTag {{levelCls}}">{{levelCn}} {{levelEn}}</div>
+        <p class="rangeDesc">谜底范围：{{rangeText}}</p>
+      </div>
+      <div class="roundBox">
+        <p class="roundNum">{{round}}</p>
+        <p class="roundMax">/ {{maxGuess}} 次可猜</p>
+      </div>
+    </div>
+
+    <div class="tableBox">
+      <div class="dataRow headRow">
+        <div class="cell playerCell"><p>玩家</p></div>
+        <div class="cell songCell"><p>歌曲</p></div>
+        <div class="cell charterCell"><p>谱师</p></div>
+        <div class="cell versionCell"><p>Version</p></div>
+        <div class="cell genreCell"><p>分类</p></div>
+        <div class="cell typeCell"><p>类型</p></div>
+        <div class="cell dsCell"><p>定数</p></div>
+        <div class="cell bpmCell"><p>BPM</p></div>
+        <div class="cell notesCell"><p>物量</p></div>
+      </div>
+
+      {{each rows row}}
+      <div class="dataRow{{row.hit ? ' rowHit' : ''}}">
+        <div class="cell playerCell"><p>{{row.player}}</p></div>
+        <div class="cell songCell state-{{row.hit ? 'same' : 'diff'}}">
+          <div class="cellMain"><p class="cellValue">{{row.song}}</p></div>
+        </div>
+        {{each row.cells cell}}
+        <div class="cell {{cell.cls}} state-{{cell.state}}">
+          <div class="cellMain">
+            <p class="cellValue">{{cell.value}}</p>
+            {{if cell.arrow == 'up'}}<span class="arrow up">↑</span>
+            {{else if cell.arrow == 'down'}}<span class="arrow down">↓</span>
+            {{else if cell.state == 'same'}}<span class="arrow ok">✓</span>{{/if}}
+          </div>
+          {{if cell.sub}}<p class="cellSub">{{cell.sub}}</p>{{/if}}
+        </div>
+        {{/each}}
+      </div>
+      {{/each}}
+
+      {{if answerRow}}
+      <div class="dataRow rowAnswer">
+        <div class="cell playerCell"><p class="answerTag">答案</p></div>
+        <div class="cell songCell state-same">
+          <div class="cellMain"><p class="cellValue">{{answerRow.song}}</p></div>
+        </div>
+        {{each answerRow.cells cell}}
+        <div class="cell {{cell.cls}} state-{{cell.state}}">
+          <div class="cellMain">
+            <p class="cellValue">{{cell.value}}</p>
+            {{if cell.arrow == 'up'}}<span class="arrow up">↑</span>
+            {{else if cell.arrow == 'down'}}<span class="arrow down">↓</span>
+            {{else if cell.state == 'same'}}<span class="arrow ok">✓</span>{{/if}}
+          </div>
+          {{if cell.sub}}<p class="cellSub">{{cell.sub}}</p>{{/if}}
+        </div>
+        {{/each}}
+      </div>
+      {{/if}}
+    </div>
+
+    <div class="legendRow">
+      <div class="legendItem"><div class="legendBox state-same"><span>✓</span></div><p>属性相同</p></div>
+      <div class="legendItem"><div class="legendBox state-near"><span>近</span></div><p>属性相近</p></div>
+      <div class="legendItem"><div class="legendBox state-diff"><span>&nbsp;</span></div><p>属性不同</p></div>
+      <div class="legendItem"><span class="legendArrow">↑</span><p>答案更高 / 更新</p></div>
+      <div class="legendItem"><span class="legendArrow">↓</span><p>答案更低 / 更早</p></div>
+      <div class="legendItem"><span class="legendArrow">—</span><p>该曲无本局难度谱面</p></div>
+    </div>
+
+    <div class="tipsRow">
+      <p>相近范围：版本前后 {{nearVersion}} 代 · 定数 ±{{nearDs}} · BPM ±{{nearBpm}} · 物量 ±{{nearNotes}}（定数/物量/谱师均取本局难度谱面）</p>
+      <p>本局参与 {{players}} 人 · 已猜 {{round}} 次 · 直接发送曲名/别名/id 竞猜 · #{{cmdHead}} ans 提前结束 · 空闲 {{timeout}} 秒自动揭晓</p>
+    </div>
+
+    <div class="footerRow"><p>mai-plugin · 弗一把</p></div>
+  </div>
+</div>
+</body>
+</html>

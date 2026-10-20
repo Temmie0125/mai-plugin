@@ -332,6 +332,74 @@ export function supportGuoba() {
           required: true,
           componentProps: { min: 10, max: 3600, placeholder: '请输入时间', addonAfter: 's' },
         },
+        {
+          component: 'Divider',
+          label: '弗一把（fib）'
+        },
+        {
+          field: 'fibGuessNumTable',
+          label: '可猜次数表',
+          bottomHelpMessage: '参与人数 → 可猜次数，逗号分隔（1 人起依次取值，超出表长取末值）。'
+            + '默认 8,9,10,12,14,17,20',
+          component: 'Input',
+        },
+        {
+          field: 'fibIdleTimeout',
+          label: '空闲收尾',
+          bottomHelpMessage: '多久没有「新的有效猜测」就自动揭晓收尾（有人猜即重置计时）',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 10, max: 3600, placeholder: '请输入时间', addonAfter: 's' },
+        },
+        {
+          field: 'fibSelfCd',
+          label: '个人冷却',
+          bottomHelpMessage: '同一人两次猜测之间的冷却，0 表示不限',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 0, max: 600, placeholder: '请输入时间', addonAfter: 's' },
+        },
+        {
+          field: 'fibGroupCd',
+          label: '全群冷却',
+          bottomHelpMessage: '全群两次猜测之间的冷却，0 表示不限。'
+            + '部分群的「每人每分钟 5 条」是群主自设的发言限制，限速严可调大',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 0, max: 600, placeholder: '请输入时间', addonAfter: 's' },
+        },
+        {
+          field: 'fibNearVersion',
+          label: '版本相近代数',
+          bottomHelpMessage: '版本相差不超过 N 代判「相近」，1 即相邻代（如 ORANGE ↔ ORANGE PLUS）',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 0, max: 10, placeholder: '请输入代数', addonAfter: '代' },
+        },
+        {
+          field: 'fibNearDs',
+          label: '定数相近范围',
+          bottomHelpMessage: '定数相差不超过该值判「相近」，支持小数（默认 0.5）',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 0, max: 5, placeholder: '请输入范围' },
+        },
+        {
+          field: 'fibNearBpm',
+          label: 'BPM相近范围',
+          bottomHelpMessage: 'BPM 相差不超过该值判「相近」',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 0, max: 1000, placeholder: '请输入范围' },
+        },
+        {
+          field: 'fibNearNotes',
+          label: '物量相近范围',
+          bottomHelpMessage: '物量（总 note 数）相差不超过该值判「相近」',
+          component: 'InputNumber',
+          required: true,
+          componentProps: { min: 0, max: 5000, placeholder: '请输入范围' },
+        },
       ],
       // 读取/写回当前配置（键与 yaml 一一对应）；dfScope 转数组供多选框回显
       getConfigData() {

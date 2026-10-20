@@ -87,6 +87,30 @@ test('规则：起手命中（带命令头）；D5 —— 裸「猜歌」「猜�
   }
 })
 
+test('规则：弗一把起手命中与参数捕获（空格可省，phi 同款）', () => {
+  const rules = new MaiGuess().rule.map(r => ({ fnc: r.fnc, reg: new RegExp(r.reg) }))
+  const hit = (msg, fnc) => rules.find(r => r.fnc === fnc).reg.test(msg)
+
+  const argOf = msg => msg.match(rules.find(r => r.fnc === 'startFib').reg)?.[1]
+  for (const [msg, want] of [
+    ['#mai fib', undefined],
+    ['#mai 弗一把', undefined],
+    ['#mai fib 红12+', '红12+'],
+    ['#mai fib红12+', '红12+'],
+    ['#mai fib 白12.5-14', '白12.5-14'],
+    ['#mai 弗一把白12.5 - 14', '白12.5 - 14'],
+    ['/mai fib', undefined],
+  ]) {
+    assert.ok(hit(msg, 'startFib'), `应命中 fib：${msg}`)
+    assert.equal(argOf(msg), want, `参数捕获：${msg}`)
+  }
+  // 命令头缺失不命中（`#maifib` 粘连命令词与本仓 `#maiguess` 同为合法形态，
+  // 粘上的非法参数如 `#mai fibabc` 会走到用法提示，非静默）
+  for (const msg of ['fib', '#maii fib']) {
+    assert.ok(!hit(msg, 'startFib'), `应拒收：${msg}`)
+  }
+})
+
 test('规则：on|off|reset 的两种写法（子命令与中文），且限群管', () => {
   const rule = new MaiGuess().rule.find(r => r.fnc === 'toggle')
   assert.equal(rule.permission, 'admin', '群开关限群管')
@@ -178,7 +202,8 @@ test('群开关：未开启的群起手被拒并给引导（白名单语义）',
   const { inst, replies } = mkInst(MaiGuess)
   // 未设置过的群 → guess 默认 false
   assert.equal(await inst.startGame(mkE('#mai 猜歌'), 'text'), true)
-  assert.match(String(replies.at(-1)), /该群已关闭猜歌功能/)
+  // 文案按「群游戏」表述：guess 开关由猜歌/猜曲绘/开字母/弗一把共用
+  assert.match(String(replies.at(-1)), /该群已关闭群游戏功能/)
   assert.match(String(replies.at(-1)), /#mai guess on/, '引导应给本插件语法，而非源的「开启mai猜歌」')
 })
 
