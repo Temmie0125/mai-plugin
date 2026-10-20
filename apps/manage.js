@@ -35,6 +35,8 @@ const H = () => head()
 let updating = false
 /** 资源包同步锁：与 updating 分开——资源包与插件是两个仓库，且插件更新后的自动同步不能撞上自己的锁 */
 let syncingRes = false
+/** autoSyncTime 非法告警每进程只打一次：本类随每条消息实例化，不设防会刷屏 */
+let warnedBadCron = false
 
 function shellPath(p) {
   return `"${p.replace(/\\/g, '/').replace(/"/g, '\\"')}"`
@@ -100,19 +102,17 @@ export class MaiManage extends MaiPlugin {
         { reg: `^[#/]${H()}\\s*(?:sync|更新曲库|数据更新)\\s*$`, fnc: 'syncMusic' },
       ],
     })
-  }
 
-  /**
-   * 定时任务装配点（宿主 loader 先跑 init 再 collectTask，且此刻配置才可读）。
-   * init() 只在插件加载时跑一次 ⇒ 配置改动天然「重启生效」，正是本项目要的语义。
-   * 宿主 plugin.js 已给 this.task 赋了 `{name:'',fnc:'',cron:''}` 占位，而 collectTask 判的是
-   * `if (i.cron && i.fnc)`（空串为假）⇒ autoSync 关闭时不覆盖即天然不注册。
-   */
-  async init() {
+    // 定时任务装配点：宿主 loader 的热刷新只重跑构造函数、不会重跑 init()（后者可能有一次性
+    // 副作用），任务必须在构造期就绪才能跟随配置热更。本插件配置是模块级单例的同步 fs 读取，
+    // 且上方 H() 已在构造期读 cmdhead，构造期读配置是既定事实。
+    // 宿主 plugin.js 已给 this.task 赋了 `{name:'',fnc:'',cron:''}` 占位，而 collectTask 判的是
+    // `if (i.cron && i.fnc)`（空串为假）⇒ autoSync 关闭时不覆盖即天然不注册。
     const cfg = Config.getUserCfg('config')
     if (!cfg.autoSync) return // 不覆盖 this.task 的占位对象 ⇒ collectTask 不注册
     const { cron, time, fallback } = resolveAutoSyncCron(cfg.autoSyncTime)
-    if (fallback) {
+    if (fallback && !warnedBadCron) {
+      warnedBadCron = true
       logger?.error?.(
         `[mai-plugin] autoSyncTime 非法：${JSON.stringify(cfg.autoSyncTime)}，已回退默认 ${time}`,
       )
@@ -394,7 +394,7 @@ export class MaiManage extends MaiPlugin {
     const out = `${what}更新失败：`
     const isPlugin = what === '插件'
     // 资源仓库推送前的首跑路径：远端无 main 分支
-    if (/couldn't find remote ref|Remote branch .+ not found|empty repository/i.test(msg)) {
+    if (/couldn't find remote ref|Remote branch .+ not found|无法找到远程引用|empty repository/i.test(msg)) {
       return `${out}远程仓库还没有 main 分支（仓库为空或资源尚未推送）。\n请先向资源仓库推送内容，或改用其它地址（配置项 assetsRepo）。`
     }
     if (/Timed out|Failed to connect|unable to access|Could not resolve/i.test(msg)) {

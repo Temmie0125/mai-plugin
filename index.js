@@ -80,7 +80,7 @@ if (!cfg.autoSync) {
   if (fallback) {
     logger.warn(
       `[mai-plugin] autoSyncTime 非法：${JSON.stringify(cfg.autoSyncTime)}，` +
-        `已回退默认 ${time}（改动需重启生效）`
+        `已回退默认 ${time}（修正后保存配置即自动生效）`
     )
   } else {
     logger.mark(`[mai-plugin] 每日自动同步曲库：${time}`)

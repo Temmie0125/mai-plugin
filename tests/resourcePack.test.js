@@ -157,7 +157,7 @@ test('syncAssets：远端为空时 clone 不抛错而标记 empty，再次执行
     // 用户推送资源前若再次执行：走 update 分支，git 报 could not find remote ref
     await assert.rejects(
       () => syncAssets({ dir: target }),
-      /couldn't find remote ref|not found/i,
+      /couldn't find remote ref|not found|无法找到远程引用/i,
       '空远端二次执行应抛出可被 gitErrText 识别为「还没有 main 分支」的错误',
     )
   })
