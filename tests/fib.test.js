@@ -233,7 +233,7 @@ test('toRenderRows：列序固定且带 class', () => {
 // ===== 状态机 =====
 
 /** 开局并免冷却（阈值是对局上的普通对象，测试直接改） */
-function startLocal({ answer, levelIndex = 3, min = null, max = null } = {}) {
+function startLocal({ answer, levelIndex = 3, min = null, max = null, selfId } = {}) {
   const sent = []
   const game = fib.startFibGame(GID, {
     answer: answer ?? SONGS[0],
@@ -243,6 +243,7 @@ function startLocal({ answer, levelIndex = 3, min = null, max = null } = {}) {
     send: async m => sent.push(m),
     starter: 1,
     starterName: 'starter',
+    selfId,
   })
   game.cfg.selfCd = 0
   game.cfg.groupCd = 0
@@ -348,4 +349,57 @@ test('startFibGame 返回的对局在共享注册表上（与其他游戏互斥�
   assert.equal(g.gameOf(GID)?.type, 'fib')
   assert.equal(g.endGame(GID)?.type, 'fib', 'endGame 能清掉 fib 对局')
   assert.equal(g.isPlaying(GID), false)
+})
+
+test('guessFib：send 闭包随猜测刷新（回复与后续结算挂最新一条）', async () => {
+  const { game, sent } = startLocal({ answer: SONGS[0] })
+  const newer = []
+
+  await fib.guessFib(GID, '101', 'B', 2) // 首猜：走开局闭包
+  assert.equal(sent.length, 1)
+
+  await fib.guessFib(GID, '102', 'C', 3, async m => newer.push(m)) // 传当前事件闭包
+  assert.equal(newer.length, 1, '对比表走新闭包')
+  assert.equal(sent.length, 1, '旧闭包不再被使用')
+
+  await fib.guessFib(GID, '100', 'C', 3) // 猜中：结算沿用刷新后的闭包
+  assert.equal(newer.length, 2, '揭晓也走新闭包')
+  assert.equal(sent.length, 1)
+})
+
+test('buildFibView：背景曲绘按 SD 原始 id 取（DX 曲 % 10000）', () => {
+  const { game } = startLocal({ answer: SONGS[0] })
+  game.lastGuessId = 11802 // DX 曲：曲绘文件是 1802.png
+  const view = fib.buildFibView(game)
+  assert.ok(!String(view.bgCover).includes('11802'), '不按 DX id 找图')
+  // 本地有资源包 → file:///…1802.png；缺失且在线回退开 → …/1802.png；缺失且关回退 → ''
+  assert.ok(view.bgCover === '' || String(view.bgCover).includes('1802'), `应含原始 id 或为空：${view.bgCover}`)
+})
+
+test('超时结算走全局发送（无 id，适配器回退群锚点）；Bot 不可用时回退 game.send', async () => {
+  fib.setTimeScale(0.001)
+  const calls = []
+  const realBot = global.Bot
+  global.Bot = { sendGroupMsg: async (selfId, gid, msg) => calls.push({ selfId, gid, msg }) }
+  try {
+    startLocal({ answer: SONGS[0], selfId: 889 })
+    await fib.guessFib(GID, '101', 'B', 2)
+    await sleep(700)
+    assert.equal(g.isPlaying(GID), false)
+    assert.equal(calls.length, 1, '超时揭晓经 Bot.sendGroupMsg')
+    assert.equal(calls[0].selfId, 889)
+    assert.equal(calls[0].gid, GID)
+  } finally {
+    global.Bot = realBot
+    fib.setTimeScale(1)
+  }
+
+  // 无 selfId / 无 Bot.sendGroupMsg（如单测环境）→ 回退 game.send
+  fib.setTimeScale(0.001)
+  const { sent } = startLocal({ answer: SONGS[0] })
+  await fib.guessFib(GID, '101', 'B', 2)
+  await sleep(700)
+  assert.equal(g.isPlaying(GID), false)
+  assert.ok(payloadText(sent.at(-1)).includes('长时间没有新的猜测'), '回退闭包仍能发出揭晓')
+  fib.setTimeScale(1)
 })

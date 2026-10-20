@@ -184,9 +184,12 @@ export class MaiGuess extends MaiPlugin {
       levelIndex: args.levelIndex,
       min: args.min,
       max: args.max,
-      send: msg => this.reply(msg, true),
+      // 禁兜底按钮（对比表与「更换主题」等无关）；每条猜测经 guessFib 用当时事件的
+      // 闭包刷新 game.send，回复始终挂最新 msgid（开局事件会过期）
+      send: msg => this.reply(msg, true, { qqBtn: false }),
       starter: e.user_id,
       starterName: displayName(e),
+      selfId: e.self_id,
     })
     await this.reply(fibBanner(game), true)
     return true
@@ -211,7 +214,8 @@ export class MaiGuess extends MaiPlugin {
       return true
     }
     const parts = await finishGame(e.group_id)
-    if (parts) await this.reply(parts, true)
+    // fib 揭晓图不附兜底按钮（与其他游戏图回复的既有行为区分开）
+    if (parts) await this.reply(parts, true, game.type === 'fib' ? { qqBtn: false } : undefined)
     return true
   }
 
@@ -330,7 +334,9 @@ export class MaiGuessAnswer extends MaiPlugin {
     }
 
     if (gameOf(gid)?.type === 'fib') {
-      return guessFib(gid, e.msg, displayName(e), e.user_id)
+      // 第 5 参：当前事件的发送闭包——guessFib 会用它刷新 game.send，
+      // 使本条回复（及之后的超时结算）挂在最新 msgid 上，而非开局事件（会过期）
+      return guessFib(gid, e.msg, displayName(e), e.user_id, msg => this.reply(msg, true, { qqBtn: false }))
     }
 
     if (!isCorrect(gid, e.msg)) return false

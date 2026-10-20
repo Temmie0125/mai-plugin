@@ -306,6 +306,20 @@ test('reply：按钮发出时撤提示附言；发不出时附言照旧', async 
   }
 })
 
+test('reply：data.qqBtn=false 显式禁用按钮（含图也不落兜底组，弗一把等游戏回复用）', async () => {
+  stubSegment()
+  const restore = stubConfig({ quoteReply: true, qqBotButtons: true })
+  try {
+    const { p, sent } = makePlugin({ adapter_name: 'QQBot' })
+    await p.reply([IMG], true, { qqBtn: false })
+    const [msg, quote] = sent[0]
+    assert.equal(quote, true)
+    assert.ok(msg.every(i => i?.type !== 'button'), '显式 false 不应附任何按钮')
+  } finally {
+    restore()
+  }
+})
+
 test('reply：data.qqBtn 场景预设（纯文本载荷也按场景附按钮）', async () => {
   stubSegment()
   const restore = stubConfig({ quoteReply: true, qqBotButtons: true })
