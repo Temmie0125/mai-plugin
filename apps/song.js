@@ -12,9 +12,10 @@
  *   （物量 = 谱面 note 总数，整数；命中难度即整曲在列，但 difficulties 裁剪到命中项——
  *   列表彩标只点亮命中物量的难度，对齐谱师过滤的 all_diff=false 语义）
  * - what / 「XX是什么歌」：本地别名 → 柚子投票态 → id → 标题链（口语正则保留，priority 1500）
+ *   投票态查询带 5s 超时（ALIAS_QUERY_TIMEOUT），且可由 aliasOnlineQuery 整体关闭
  */
 import { MaiPlugin } from '../lib/qqbot.js'
-import { head } from '../lib/config.js'
+import Config, { head } from '../lib/config.js'
 import { getUserAndAuth } from '../lib/user.js'
 import { drawChartInfo, drawSongList, drawVoteList, sortVotes, hasNumericQq, ALIAS_QQ_HINT } from '../lib/handler.js'
 import { toSegment, botName } from '../lib/render/picmodle.js'
@@ -309,9 +310,10 @@ export class MaiSong extends MaiPlugin {
     const got = await getUserAndAuth(e, { requireAuth: true, checkSkip: true, botName: botName() })
     const user = got?.user ?? null
 
-    // 别名
+    // 别名（本地未命中 → 柚子投票态，5s 超时快速回落；aliasOnlineQuery 关闭时不联网，
+    // 直接走下面的 id/标题兜底——别名服务器不可达环境里保证反查秒回）
     let aliasData = mai.totalAliasList.byAlias(name)
-    if (!aliasData.length) {
+    if (!aliasData.length && Config.getUserCfg('config', 'aliasOnlineQuery')) {
       try {
         const obj = await new YuzuChaNAPI().getSongs(name)
         if (obj && obj.type === 'ongoing' && Array.isArray(obj.data) && obj.data[0]?.tag !== undefined) {
@@ -326,7 +328,7 @@ export class MaiSong extends MaiPlugin {
         if (Array.isArray(obj?.data)) {
           aliasData = obj.data.map(a => ({ song_id: a.song_id, song_name: a.name, alias: a.alias }))
         }
-      } catch { /* 网络失败按未找到处理 */ }
+      } catch { /* 网络失败/超时按未找到处理 */ }
     }
 
     if (aliasData.length) {

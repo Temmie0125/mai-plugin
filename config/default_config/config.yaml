@@ -10,6 +10,9 @@ cmdhead: mai
 botName: ''
 # 柚子别名服务器 cn 镜像（网络环境不佳时开启）
 aliasProxy: false
+# 「什么歌」反查联网：本地别名未命中时向柚子别名服务器查询（投票中的别名/新收录别名）。
+# 请求本身带 5 秒超时；别名服务器访问慢或不可达、只用本地别名库时可整个关闭，反查秒回
+aliasOnlineQuery: true
 # 别名推送总开关（SSE/WS 推送新别名到开启的群）
 aliasPush: true
 

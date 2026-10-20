@@ -59,6 +59,14 @@ export function supportGuoba() {
           component: 'Switch',
         },
         {
+          field: 'aliasOnlineQuery',
+          label: '什么歌联网反查',
+          bottomHelpMessage: '「XX是什么歌」本地别名未命中时联网查询柚子别名服务器'
+            + '（投票中的别名/新收录别名，请求带 5 秒超时）；服务器访问慢或不通、'
+            + '只用本地别名库时可关闭，反查秒回',
+          component: 'Switch',
+        },
+        {
           field: 'autoRecallAuthMsg',
           label: '自动撤回授权消息',
           bottomHelpMessage: '收到授权码后撤回 Bot 发的授权链接；绑定成功且 Bot 是群管理员时连授权码一起撤回。'
