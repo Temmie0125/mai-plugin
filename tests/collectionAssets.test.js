@@ -7,7 +7,7 @@
  * `config.assetsOnline`（在线素材回退）接上。
  *
  * 本文件锁三件事（不触网、不起浏览器、不写资源包）：
- *   ① 路径与在线切图同号（`mai/icon/302.webp` ↔ `UI_Icon_000302.png`）；
+ *   ① 路径与在线切图同号（`mai/icon/302.webp` ↔ 落雪 `/icon/302.png`，官方 UI id 两侧一致）；
  *   ② 回退次序：本地 → 在线 → 空串（调用方回退默认图）；
  *   ③ 视图接线：b50View 头部两处切图确实走该次序。
  */
@@ -39,9 +39,9 @@ const { b50View, picSrc } = await import('../lib/render/views.js')
 const DEFAULT_ICON = picSrc('UI_Icon_509506.png')
 const DEFAULT_PLATE = picSrc('UI_Plate_550101.png')
 
-/** 在线切图 URL 形态（源 _fetch_image：UI_Icon_000302.png / UI_Plate_000123.png，6 位补零） */
-const onlineIcon = id => `https://www.yuzuchan.moe/assets/maimaidx/icon/UI_Icon_${String(id).padStart(6, '0')}.png`
-const onlinePlate = id => `https://www.yuzuchan.moe/assets/maimaidx/plate/UI_Plate_${String(id).padStart(6, '0')}.png`
+/** 在线切图 URL 形态（落雪游戏资源 assets2.lxns.net/maimai，官方 UI id 不补零） */
+const onlineIcon = id => `https://assets2.lxns.net/maimai/icon/${id}.png`
+const onlinePlate = id => `https://assets2.lxns.net/maimai/plate/${id}.png`
 
 /** 假资源根：只放 icon/302.webp 一张，用于「本地命中」分支（不动真资源包） */
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-cutout-'))
@@ -75,7 +75,7 @@ test('collection：按收藏品 id 命名（不补零），type 决定子目录'
   assert.equal(collection('plate', 100001, root), path.join(root, 'mai', 'plate', '100001.webp'))
 })
 
-test('collectionSrc：本地缺失 → 在线切图 URL（源 _fetch_image 的 UI_Type_000000.png 形态）', () => {
+test('collectionSrc：本地缺失 → 在线切图 URL（落雪 assets2，与本地 webp 同号不补零）', () => {
   // 假资源根里只有 icon/302.webp，其余一律视为缺图
   assert.equal(collectionSrc('plate', 123, { root }), onlinePlate(123))
   assert.equal(collectionSrc('icon', 303, { root }), onlineIcon(303))

@@ -1012,8 +1012,9 @@ body::before {
       <!-- 层3：完美的上下分色渐变线框 -->
       <div class="gradient-line"></div>
 
-      <!-- 层4：曲绘与文字 -->
-      <img src="{{coverSrc}}" class="cover-image" alt="曲绘">
+      <!-- 层4：曲绘与文字（在线回退加载失败 → 默认曲绘，路径同 songChartParts 末级） -->
+      <img src="{{coverSrc}}" class="cover-image" alt="曲绘"
+        onerror="this.onerror=null;this.src='{{_staticPath}}/mai/cover/0.png'">
            
       <p class="song-title">{{song.title}}</p>
       <p class="song-subtitle">{{song.artist}}</p>

@@ -216,7 +216,9 @@ test('suggestView：块头窗口/行/空档文案与整体尺寸', () => {
   assert.match(all, /未玩/)
   assert.match(all, /定数差 \+0\.40/)
   assert.match(all, /暂无符合条件的谱面/)   // 空档提示（fixture 只覆盖部分窗口）
-  const covers = view.images.filter(im => String(im.src).includes('/cover/'))
+  // 曲绘三态：本地命中 → file://…/cover/…；缺失 → 落雪 …/jacket/…（本地 0.png 挪到 fallback 兜底）
+  const isCover = im => /\/(cover|jacket)\//.test(String(im.src)) || /\/cover\//.test(String(im.fallback ?? ''))
+  const covers = view.images.filter(isCover)
   assert.ok(covers.length >= 2)
   assert.ok(covers.every(im => im.z === 2))
 })

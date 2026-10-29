@@ -11,7 +11,7 @@ test('assetCache：cacheKey/extOf 锁值', async () => {
   // 同 URL 同 key、不同 URL 不同 key
   assert.equal(cacheKey('https://a.b/x.png'), cacheKey('https://a.b/x.png'))
   assert.notEqual(cacheKey('https://a.b/x.png'), cacheKey('https://a.b/y.png'))
-  assert.equal(extOf('https://www.yuzuchan.moe/assets/maimaidx/icon/UI_Icon_000302.png'), '.png')
+  assert.equal(extOf('https://assets2.lxns.net/maimai/icon/302.png'), '.png')
   assert.equal(extOf('https://cdn/x.PNG?q=1'), '.png')
   assert.equal(extOf('not a url'), '.png')
   assert.equal(extOf('https://a.b/none'), '.png')
@@ -59,4 +59,47 @@ test('assetCache：mock fetch 落盘 + 命中复用不发二次请求 + 失败�
   // 清理本次落盘（保留目录本身无妨，属 data/ 运行产物；为测试隔离删除该文件）
   const file = first.replace('file:///', '').replace(/\//g, path.sep)
   if (existsSync(file)) rmSync(file)
+})
+
+// 落雪游戏资源限频：失败进负缓存，冷却期内不重发（成功缓存是永久落盘，不受此限）；
+// ensureLocalAssets 对下载失败的 src 就地降级 fallback，不再把在线 URL 留给浏览器重发一次。
+// 全程先用注入的 fetchImpl 预置成败态，ensureLocalAssets 内部走缓存/负缓存，不触真网络。
+test('assetCache：失败负缓存冷却 + 失败降级 fallback + 裸字段缓存', async () => {
+  const mod = await import('../lib/render/assetCache.js')
+  const { ensure, ensureLocalAssets } = mod
+  let calls = 0
+  const failUrl = 'https://lxns.example.test/jacket/99999.png'
+  const failImpl = async () => { calls++; return { ok: false } }
+
+  assert.equal(await ensure(failUrl, { fetchImpl: failImpl }), null)
+  assert.equal(await ensure(failUrl, { fetchImpl: failImpl }), null, '冷却期内第二次不发请求')
+  assert.equal(calls, 1)
+
+  // 失败 + 有 fallback → 就地降级（fallback 本身是 file://，无需下载）
+  const data = { images: [{ src: failUrl, fallback: 'file:///local/0.png' }] }
+  await ensureLocalAssets(data)
+  assert.equal(data.images[0].src, 'file:///local/0.png')
+  assert.ok(!('fallback' in data.images[0]), '降级后 fallback 应被摘除')
+
+  // 失败 + 无 fallback → 维持在线 URL 原样（浏览器自决）
+  const bareUrl = 'https://lxns.example.test/jacket/99998.png'
+  await ensure(bareUrl, { fetchImpl: failImpl })
+  const bare = { images: [{ src: bareUrl }] }
+  await ensureLocalAssets(bare)
+  assert.equal(bare.images[0].src, bareUrl)
+
+  // 裸字段（fsline coverSrc / fib bgCover）：先落盘成功缓存 → 裸字段被替换为本地
+  const okUrl = 'https://lxns.example.test/jacket/1.png'
+  const ok = await ensure(okUrl, {
+    fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([9]) }),
+  })
+  const data2 = { coverSrc: okUrl }
+  await ensureLocalAssets(data2)
+  assert.equal(data2.coverSrc, ok)
+
+  // 清理本次落盘
+  for (const u of [ok]) {
+    const f = u.replace('file:///', '').replace(/\//g, path.sep)
+    if (existsSync(f)) rmSync(f)
+  }
 })
