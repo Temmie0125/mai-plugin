@@ -4,6 +4,7 @@
  *    由 `tests/refs/gen-fsline-ref.mjs` 真跑样板抓取，本测试逐格比对）；
  *    ⚠️ 不能抄样板 markup 里的数字：它与自身物量对不上（是上一次渲染的残留），**脚本才是规格**；
  * ② 命令层：`parseFslineArgs`（达成率**可选**）纯函数 + 命令路径（桩掉 sendFsline，不真渲染）；
+ *    另有海报视图的长分区名断行（`genreHtml` 服务端做死 <br>，不依赖页面内脚本——Shotium 无 JS）；
  * ③ 附加文本 `fslineText`（给了达成率时图外补的那行）与帮助文案——沿用源 mai_score.py:139-167 口径。
  */
 import { test } from 'node:test'
@@ -27,6 +28,8 @@ if (!global.logger) {
 let MaiGlobal = null
 let parseFslineArgs = null
 let fslineText = null
+let fslineView = null
+let genreHtml = null
 let FSLINE_HELP = null
 let FSLINE_FORMAT_ERROR = null
 let FSLINE_ARGS_ERRORS = null
@@ -152,7 +155,37 @@ test('对照样板：六组物量 × 四张表逐格一致', () => {
 
 test('准备：载入 apps/global.js 与 lib/handler.js（命令层）', async () => {
   ({ MaiGlobal, parseFslineArgs } = await import('../apps/global.js'));
-  ({ fslineText, FSLINE_HELP, FSLINE_FORMAT_ERROR, FSLINE_ARGS_ERRORS } = await import('../lib/handler.js'))
+  ({ fslineText, fslineView, genreHtml, FSLINE_HELP, FSLINE_FORMAT_ERROR, FSLINE_ARGS_ERRORS } =
+    await import('../lib/handler.js'))
+})
+
+test('fslineView/genreHtml：长分区名换行在服务端做死（<br> 进数据，无 JS 渲染器也断行）', () => {
+  // 曲 11797 バベル：旧实现靠页面内 <script> 拆文本节点断行，Shotium 等无 JS 渲染器
+  // 不执行脚本 → 整串一行排出、压到右侧 BPM（线上实测）。现断行由服务端写进数据。
+  const song = {
+    song_id: 11797,
+    song_name: 'バベル',
+    artist: 'いよわ feat.重音テト',
+    genre: 'niconico & VOCALOID',
+    bpm: 225,
+    type: 'DX',
+    difficulties: [{
+      level: '13', level_value: 13.5,
+      notes: { tap: 401, hold: 15, slide: 12, touch: 0, brk: 7 },
+    }],
+  }
+  const view = fslineView(song, 0)
+  assert.equal(view.song.genreClass, ' niconicoVOCALOID')
+  // 断点吃掉「&」后的那个空格，两行均无行首/行尾空白；& 按 HTML 转义
+  assert.equal(view.song.genreHtml, 'niconico &amp;<br>VOCALOID')
+
+  // 短分区名：同一转义口径，但不断行
+  assert.equal(genreHtml('舞萌', false), '舞萌')
+  assert.equal(genreHtml('niconico & VOCALOID', false), 'niconico &amp; VOCALOID')
+  // niconico 类但「&」后无空格可断（防御路径的日文内部串）：原样转义
+  assert.equal(genreHtml('niconicoボーカロイド', true), 'niconicoボーカロイド')
+  // 输出走 {{@ }} 非转义插值，<、>、& 须在此自净
+  assert.equal(genreHtml('a<b & c>d', true), 'a&lt;b &amp;<br>c&gt;d')
 })
 
 test('参数解析（达成率给了）：末 token 是数字 → line 取该数', () => {
