@@ -75,12 +75,15 @@ test('FS：sync 单列，其余按 SYNC_D_SP 序累计', () => {
   assert.deepEqual([fsd.fs, fsd.fsp, fsd.fsd, fsd.fsdp], [1, 1, 1, 0])
 })
 
-test('playedMap：song_id → level_index → {achievements, level, fc}', () => {
-  const { playedMap } = processRatingTableData('13', [rec(7, 2, 99.1, { fc: 'fc' }), rec(7, 3, 100.0)])
+test('playedMap：song_id → level_index → {achievements, level, fc, fs}（fs 供计划组判定，源 efa55a9）', () => {
+  const { playedMap } = processRatingTableData('13', [
+    rec(7, 2, 99.1, { fc: 'fc' }), rec(7, 3, 100.0, { fs: 'fsd' }), rec(7, 4, 100.0),
+  ])
   const song = playedMap.get(7)
-  assert.equal(song.size, 2)
-  assert.deepEqual(song.get(2), { achievements: 99.1, level: '13', fc: 'fc' })
-  assert.equal(song.get(3).achievements, 100.0)
+  assert.equal(song.size, 3)
+  assert.deepEqual(song.get(2), { achievements: 99.1, level: '13', fc: 'fc', fs: null })
+  assert.equal(song.get(3).fs, 'fsd')
+  assert.equal(song.get(4).achievements, 100.0)
 })
 
 // 源判定是 `count == lvlist_num`（**恰好等于**总数 = 全员达标）才进档，否则 break；
@@ -101,13 +104,17 @@ test('calcAchievementsFc：非 plan 走 ACHIEVEMENT_LIST 末 6 档', () => {
   assert.equal(calcAchievementsFc([100.5, 100.5, 100.5, 100.5, 99.9, 100.5], 6, false), 3) // 卡在 99.5 档
 })
 
-test('calcAchievementsFc：plan 走 range(4)，入参为 COMBO_SP 下标', () => {
-  assert.equal(calcAchievementsFc([2, 2, 2], 3, true), 2)    // 全 ap（下标2）→ 档2
-  assert.equal(calcAchievementsFc([0, 0, 0], 3, true), 0)
-  assert.equal(calcAchievementsFc([3, 3, 3], 3, true), 3)
-  assert.equal(calcAchievementsFc([3, 2, 3], 3, true), 2)    // 全员 ≥2 → 档2；档3 掉队
-  assert.equal(calcAchievementsFc([3, 1, 3], 3, true), 1)    // 档2 掉队 → 封顶档1
-  assert.equal(calcAchievementsFc([3, 3], 3, true), -1)      // 数量不足 → 首档即不满
+test('calcAchievementsFc：plan 为 CB_SYNC_MAP 状态组，入参为组内档位下标（源 efa55a9）', () => {
+  const FC = ['fc', 'fcp', 'ap', 'app']                   // 4 档，同源 range(len(plan))
+  assert.equal(calcAchievementsFc([2, 2, 2], 3, FC), 2)    // 全 ap（下标2）→ 档2
+  assert.equal(calcAchievementsFc([0, 0, 0], 3, FC), 0)
+  assert.equal(calcAchievementsFc([3, 3, 3], 3, FC), 3)
+  assert.equal(calcAchievementsFc([3, 2, 3], 3, FC), 2)    // 全员 ≥2 → 档2；档3 掉队
+  assert.equal(calcAchievementsFc([3, 1, 3], 3, FC), 1)    // 档2 掉队 → 封顶档1
+  assert.equal(calcAchievementsFc([3, 3], 3, FC), -1)      // 数量不足 → 首档即不满
+  const FDXP = ['fsdp']                                    // 1 档组：阈值只有 0
+  assert.equal(calcAchievementsFc([0, 0], 2, FDXP), 0)
+  assert.equal(calcAchievementsFc([5, 5], 2, FDXP), 0, '下标 ≥ 阈值 0 即满足（组内只此一档）')
 })
 
 test('calcAchievementsFc：数量不足总数时不返档（-1）', () => {

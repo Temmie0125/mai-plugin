@@ -89,9 +89,9 @@
       },
       {
         "title": "plate",
-        "params": "<定数> [fc|ap]",
-        "eg": "#{head} plate 13 fc",
-        "desc": "定数完成表（fc/ap 计划；不填为全清表）"
+        "params": "<定数> [计划]",
+        "eg": "#{head} plate 13 fs",
+        "desc": "定数完成表（计划 fc/fc+/ap/ap+/fs/fs+/fdx/fdx+；不填为全清表）"
       },
       {
         "title": "plate",

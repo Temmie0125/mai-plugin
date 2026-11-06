@@ -4,7 +4,7 @@
  *
  * 命令形态与源触发词的对应：
  *   源 `([0-9]+\+?)定数表`        → `table <定数>` / `定数表 <定数>`
- *   源 `RATING_PATTERN 完成表`     → `plate <定数> [fc|ap]`
+ *   源 `RATING_PATTERN 完成表`     → `plate <定数> [计划]`（CB_SYNC_MAP 键；评级计划按源视为普通表）
  *   源 `TABLE_PATTERN 完成表/进度` → `plate <版本称号> [完成表|进度] [页]`
  *   源 `牌子条件`                 → `plateinfo`
  *   源 `LEVEL_PATTERN 进度`       → `progress <定数> <目标> [类别] [页]`
@@ -27,10 +27,13 @@ import { toSegment, botName } from '../lib/render/picmodle.js'
 import { getUserAndAuth } from '../lib/user.js'
 import { listKeyPattern, listPresetOf } from '../lib/variantSpec.js'
 import {
-  COMBO_PLUS, LEVEL_LIST, PLATE_CN, PLAN_CHARS, RANK_PLUS, SYNC_PLUS, VERSION_CHARS,
+  CB_SYNC_MAP, COMBO_PLUS, LEVEL_LIST, PLATE_CN, PLAN_CHARS, RANK_PLUS, SYNC_PLUS, VERSION_CHARS,
 } from '../lib/constants.js'
 
 const H = () => head()
+
+/** 完成表计划字的合法形态（源 RATING_PATTERN 计划段 `(s+|ap|fc|fs|fdx)\+?`；s+ 是量词 = s/ss/sss…） */
+const RATING_PLAN_TOKEN_RE = /^(?:s+|ap|fc|fs|fdx)\+?$/
 
 // 版本字/称号字已上移到 lib/constants.js（随心配变体解析层也要用同一份，见 b50扩展实现设计 §2.3）
 // 此处转出以保持既有导出面（曾定义在本文件，外部可能仍在 import）
@@ -184,9 +187,11 @@ export class MaiTable extends MaiPlugin {
   }
 
   /**
-   * #mai plate <定数> [fc|ap] —— 源 mai_table.py:83 rating_table_pfm.handle
+   * #mai plate <定数> [计划] —— 源 mai_table.py:83 rating_table_pfm.handle
    * 判定顺序照搬源：① lv1-6 ② 在 lv7-15 内先校验计划名 ③ 其余为未知定数
-   * （注意源正则虽收 s/fs/fdx，但守卫只放 COMBO_PLUS —— 这个不对称是源行为，勿"修正"）
+   * 源 efa55a9：计划从 fc/ap 布尔升级为 CB_SYNC_MAP 状态组（fc/fc+/ap/ap+/fs/fs+/fdx/fdx+）。
+   * 评级计划（s/ss/sss 及其 + 形态）在源 RATING_PATTERN 里合法但 CB_SYNC_MAP 无此键 →
+   * 视为无计划的普通完成表（源行为，普通完成表本身就逐格画评级）；其余未知计划字报错。
    */
   async ratingPlate(e) {
     if (!(await ensureReady(e))) return true
@@ -202,14 +207,19 @@ export class MaiTable extends MaiPlugin {
       await this.reply('无法识别的定数。', true)
       return true
     }
-    if (plan && !COMBO_PLUS.includes(plan)) {
-      await this.reply('完成表目前仅支持「fc」「ap」计划，例如「13fc完成表」「13ap完成表」。', true)
-      return true
+    let planGroup = null
+    if (plan) {
+      planGroup = CB_SYNC_MAP[plan] ?? null
+      if (!planGroup && !RATING_PLAN_TOKEN_RE.test(plan)) {
+        await this.reply('完成表计划支持 fc/fc+/ap/ap+/fs/fs+/fdx/fdx+；评级计划（s/ss/sss）直接发无计划完成表即可。', true)
+        return true
+      }
+      // 评级计划 → planGroup 保持 null：普通完成表（源 CB_SYNC_MAP.get(plan) 为 None 的同款行为）
     }
 
     const got = await getUserAndAuth(e, { requireAuth: true, botName: botName() })
     if (!got) return true
-    const payload = await drawRatingTable(got.user, rating, Boolean(plan))
+    const payload = await drawRatingTable(got.user, rating, planGroup)
     await this.reply(toSegment(payload), true)
     return true
   }
@@ -373,7 +383,7 @@ export class MaiTable extends MaiPlugin {
     }
     const token = raw.split(/\s+/)[0]
     if (/^[0-9]/.test(token)) {
-      await this.reply(`无法识别的定数完成表「${raw}」。请输入 7-15 的定数，可加 fc/ap，例如「#${H()} plate 13 fc」。`, true)
+      await this.reply(`无法识别的定数完成表「${raw}」。请输入 7-15 的定数，可加计划（fc/ap/fs/fdx 及其 + 形态），例如「#${H()} plate 13 fc」。`, true)
       return true
     }
     const v = PLATE_CN[token[0]] || token[0]

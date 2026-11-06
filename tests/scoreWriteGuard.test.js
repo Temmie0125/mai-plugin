@@ -103,17 +103,19 @@ function stubClients() {
   const original = {
     dfB50: DivingFishAPI.prototype.queryUserB50,
     dfRecords: DivingFishAPI.prototype.queryUserRecords,
-    dfPlate: DivingFishAPI.prototype.queryUserPlate,
     lxPlayer: LxnsAPI.prototype.player,
     lxBests: LxnsAPI.prototype.best50,
     lxAp: LxnsAPI.prototype.ap50,
     lxAllBest: LxnsAPI.prototype.allBest,
   }
-  const calls = { dfB50: 0, dfRecords: 0, dfPlate: 0, player: 0, best50: 0, ap50: 0, allBest: 0 }
+  const calls = { dfB50: 0, dfRecords: 0, dfRecordsFilter: null, player: 0, best50: 0, ap50: 0, allBest: 0 }
 
   DivingFishAPI.prototype.queryUserB50 = async function () { calls.dfB50++; return DF_USERINFO }
-  DivingFishAPI.prototype.queryUserRecords = async function () { calls.dfRecords++; return DF_RECORDS }
-  DivingFishAPI.prototype.queryUserPlate = async function () { calls.dfPlate++; return [] }
+  DivingFishAPI.prototype.queryUserRecords = async function (query) {
+    calls.dfRecords++
+    calls.dfRecordsFilter = query ?? null
+    return DF_RECORDS
+  }
   LxnsAPI.prototype.player = async function () { calls.player++; return LXNS_PLAYER }
   LxnsAPI.prototype.best50 = async function () { calls.best50++; return LXNS_BESTS }
   LxnsAPI.prototype.ap50 = async function () { calls.ap50++; return LXNS_BESTS }
@@ -124,7 +126,6 @@ function stubClients() {
     restore() {
       DivingFishAPI.prototype.queryUserB50 = original.dfB50
       DivingFishAPI.prototype.queryUserRecords = original.dfRecords
-      DivingFishAPI.prototype.queryUserPlate = original.dfPlate
       LxnsAPI.prototype.player = original.lxPlayer
       LxnsAPI.prototype.best50 = original.lxBests
       LxnsAPI.prototype.ap50 = original.lxAp
@@ -420,7 +421,7 @@ test('records 护栏：走无 version 路径（df 轻接口永不被调用）', 
     const records = await getPlayerResultCached(user)
 
     assert.equal(stub.calls.dfRecords, 1, '应走全量接口')
-    assert.equal(stub.calls.dfPlate, 0, '不得走 df 轻接口（其结果是版本过滤的子集，属变体数据）')
+    assert.ok(!stub.calls.dfRecordsFilter, '不得带 version 筛选（其结果是版本过滤的子集，属变体数据）')
     assert.equal(records.length, DF_RECORDS.length)
 
     const cache = scoreCache.readRecords(user.key)

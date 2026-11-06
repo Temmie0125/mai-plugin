@@ -48,7 +48,7 @@ const { processRatingTableData, processPlateTable, processLevelProgress, process
 const { levelPlanHeights, levelScoreListLayout } = await import('../lib/tableLayout.js')
 const { getRiseScoreList } = await import('../lib/tableData.js')
 const { riseView } = await import('../lib/render/scoreViews.js')
-const { VERSION_MAP } = await import('../lib/constants.js')
+const { VERSION_MAP, CB_SYNC_MAP } = await import('../lib/constants.js')
 const { fitBest50 } = await import('../lib/fit.js')
 
 const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'out')
@@ -376,8 +376,12 @@ const plateRows = lv13Songs.filter((_, i) => i % 6 !== 5)
 const plateFullRows = lv13Songs.map((s, i) => makeTableRecord(s, {
   ach: 100.5, fc: i % 2 === 0 ? 'app' : null, fs: i % 3 === 0 ? 'fsdp' : null,
 }))
-// ③ fc 计划（COMBO 路）：全谱面 ap → 触发 50×50 FC 图标与 Allclear AP 徽章
+// ③ fc 计划（COMBO 路，CB_SYNC_MAP 组）：全谱面 ap → 触发 50×50 AP 图标与 Allclear AP 徽章
 const plateFcRows = lv13Songs.map(s => makeTableRecord(s, { ach: 100.5, fc: 'ap' }))
+// ④ fs 计划（SYNC 路，源 efa55a9）：混出 fs/fsp/fsd → 触发 FSD 图标路径（record.fs 判定分支）
+const plateFsRows = lv13Songs.map((s, i) => makeTableRecord(s, {
+  ach: 100.5, fc: 'ap', fs: ['fs', 'fsp', 'fsd', 'fsdp'][i % 4],
+}))
 
 function plateFixture(rows, plan) {
   const { statistics, playedMap } = processRatingTableData('13', rows)
@@ -385,9 +389,10 @@ function plateFixture(rows, plan) {
     rating: '13', levelData: mai.totalLevelData['13'], plan, statistics, playedMap, botName: 'MaiTest',
   })
 }
-results.plate = await shot('plate', await renderPanel('plate', plateFixture(plateRows, false)))
-results['plate-full'] = await shot('plate-full', await renderPanel('plate-full', plateFixture(plateFullRows, false)))
-results['plate-fc'] = await shot('plate-fc', await renderPanel('plate-fc', plateFixture(plateFcRows, true)))
+results.plate = await shot('plate', await renderPanel('plate', plateFixture(plateRows, null)))
+results['plate-full'] = await shot('plate-full', await renderPanel('plate-full', plateFixture(plateFullRows, null)))
+results['plate-fc'] = await shot('plate-fc', await renderPanel('plate-fc', plateFixture(plateFcRows, CB_SYNC_MAP.fc)))
+results['plate-fs'] = await shot('plate-fs', await renderPanel('plate-fs', plateFixture(plateFsRows, CB_SYNC_MAP.fdx)))
 
 // -- 8. 版本称号完成表（含舞/霸的两页与 5 槽位白谱点）--
 // 成绩按「曲 id + 槽位」确定式生成，两侧共用同一份行，避免各自推导漂移

@@ -349,3 +349,33 @@ test('回归：PLAN_MAP 覆盖全部目标，且 d 档取 ACHIEVEMENT_LIST 末�
   assert.deepEqual(PLAN_MAP['ap+'], [1, 3])
   assert.deepEqual(PLAN_MAP.fdx, [2, 2])
 })
+
+test('回归：CB_SYNC_MAP 状态组逐键对源（完成表计划，源 efa55a9）', async () => {
+  const { CB_SYNC_MAP, CB_ICON_MAP, COMBO_MAP, SYNC_MAP } = await import('../lib/constants.js')
+  assert.deepEqual(CB_SYNC_MAP, {
+    fc: ['fc', 'fcp', 'ap', 'app'],
+    'fc+': ['fcp', 'ap', 'app'],
+    ap: ['ap', 'app'],
+    'ap+': ['app'],
+    fs: ['fs', 'fsp', 'fsd', 'fsdp'],
+    'fs+': ['fsp', 'fsd', 'fsdp'],
+    fdx: ['fsd', 'fsdp'],
+    'fdx+': ['fsdp'],
+  })
+  // 组内每个状态都必须能查到图标名（渲染层 COMBO_MAP | SYNC_MAP 合并查表）
+  for (const group of Object.values(CB_SYNC_MAP)) {
+    for (const status of group) {
+      assert.ok(CB_ICON_MAP[status], `状态 ${status} 缺图标名（COMBO_MAP/SYNC_MAP 未覆盖）`)
+    }
+  }
+  assert.equal(CB_ICON_MAP.fs, SYNC_MAP.fs)
+  assert.equal(CB_ICON_MAP.app, COMBO_MAP.app)
+})
+
+test('parseVersionPlate：繁体「鏡」归一到本地简体键（方向与源相反，本地适配）', async () => {
+  const { parseVersionPlate } = await import('../apps/table.js')
+  const { VERSION_CHARS } = await import('../lib/constants.js')
+  assert.ok(VERSION_CHARS.includes('鏡'), '繁体鏡应进 VERSION_CHARS（入口正则可识别）')
+  assert.deepEqual(parseVersionPlate('鏡', '将', null, null), { ver: '镜', plan: '将', page: 1, isProgress: false })
+  assert.deepEqual(parseVersionPlate('镜', '将', null, null), { ver: '镜', plan: '将', page: 1, isProgress: false })
+})

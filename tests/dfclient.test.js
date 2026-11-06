@@ -1,9 +1,11 @@
 /**
- * 水鱼客户端新增端点与 getPlayerResult 单测（P2b）
+ * 水鱼客户端端点单测（P2b；源 efa55a9 后重写）
  *
  * 手法：打桩 globalThis.fetch，直接断言**真实发出的请求**（URL / method / body）。
- * 重点守的是移植期钉死的那条不变量：**oauth 分支必须用独立 payload，绝不能把 qq 泄漏进
- * /player/plate 或 /player/records**（源 client.py:116/135；泄漏会导致代查越权到别的账号）。
+ * 源 efa55a9（v3.1.5）后成绩查询只剩 OAuth GET /player/records 一条通道：
+ * 旧 /dev/*、/query/plate 已随开发者 token 废弃，这里守的是——
+ * ① 一切成绩查询都打到 /player/records 且带 Bearer；② 筛选条件走 query string，
+ * 数组按 httpx 语义展开成重复键；③ undefined 的筛选项不上送。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -44,7 +46,6 @@ function stubFetch(route) {
   return calls
 }
 
-const jsonBody = (call) => (call.body ? JSON.parse(call.body) : null)
 const findCall = (calls, frag) => calls.find(c => c.url.includes(frag))
 
 test('准备：动态载入被测模块（logger 打桩须先于 service 顶层求值）', async () => {
@@ -56,80 +57,51 @@ test('准备：动态载入被测模块（logger 打桩须先于 service 顶层�
 })
 
 // =====================================================================
-// queryUserPlate
+// queryUserRecords（源 efa55a9 后的唯一成绩端点，OAuth-only）
 // =====================================================================
 
-test('queryUserPlate 非 oauth：POST /query/plate，载荷含查询载体 + version', async () => {
-  const calls = stubFetch(() => ({ body: { verlist: [{ song_id: 1 }, { song_id: 2 }] } }))
-  const api = new DivingFishAPI(null, 'someuser') // 传 username → oauth 关闭
-  assert.equal(api.oauth, false)
-  const out = await api.queryUserPlate(['maimai でらっくす PRiSM PLUS'])
-
-  const call = findCall(calls, '/query/plate')
-  assert.ok(call, '应打到 /query/plate')
-  assert.equal(call.method, 'POST')
-  assert.deepEqual(jsonBody(call), { username: 'someuser', version: ['maimai でらっくす PRiSM PLUS'] })
-  assert.deepEqual(out, [{ song_id: 1 }, { song_id: 2 }])
-})
-
-test('queryUserPlate oauth：POST /player/plate，载荷**只有 version**（不得带 qq）', async () => {
-  const calls = stubFetch((u) => u.includes('/oauth/token')
-    ? { body: { access_token: 'TK', expires_in: 300 } }
-    : { body: { verlist: [{ song_id: 7 }] } })
-
-  const api = new DivingFishAPI(114515)
-  api.oauth = true // 强制走 oauth 分支（不依赖本机是否配了 df 凭据）
-  const out = await api.queryUserPlate(['v'])
-
-  const call = findCall(calls, '/player/plate')
-  assert.ok(call, '应打到 /player/plate')
-  assert.equal(call.method, 'POST')
-  assert.deepEqual(jsonBody(call), { version: ['v'] }, 'oauth 载荷必须仅含 version')
-  assert.equal(jsonBody(call).qq, undefined, 'qq 不得泄漏进 oauth 端点')
-  assert.equal(call.headers.Authorization, 'Bearer TK')
-  assert.deepEqual(out, [{ song_id: 7 }])
-})
-
-test('queryUserPlate：verlist 缺失时回退空数组', async () => {
-  stubFetch(() => ({ body: {} }))
-  const api = new DivingFishAPI(null, 'u')
-  assert.deepEqual(await api.queryUserPlate(['v']), [])
-})
-
-// =====================================================================
-// queryUserRecords
-// =====================================================================
-
-test('queryUserRecords 非 oauth：GET /dev/player/records（载荷走 query string）', async () => {
-  const calls = stubFetch(() => ({ body: { records: [{ song_id: 3 }] } }))
-  const api = new DivingFishAPI(null, 'someuser')
-  const out = await api.queryUserRecords()
-
-  const call = findCall(calls, '/dev/player/records')
-  assert.ok(call, '应打到 /dev/player/records')
-  assert.equal(call.method, 'GET')
-  assert.equal(call.body, null)
-  assert.match(call.url, /[?&]username=someuser/)
-  assert.doesNotMatch(call.url, /[?&]qq=/, 'username 流不应携带 qq')
-  assert.deepEqual(out, [{ song_id: 3 }])
-})
-
-test('queryUserRecords oauth：GET /player/records，无 query 参数', async () => {
+test('queryUserRecords：GET /player/records，无筛选时不带 query string', async () => {
   const calls = stubFetch((u) => u.includes('/oauth/token')
     ? { body: { access_token: 'TK2', expires_in: 300 } }
     : { body: { records: [{ song_id: 9 }] } })
 
   const api = new DivingFishAPI(114516)
-  api.oauth = true
   const out = await api.queryUserRecords()
 
   const call = findCall(calls, '/player/records')
   assert.ok(call, '应打到 /player/records')
   assert.equal(call.method, 'GET')
   assert.equal(call.body, null)
-  assert.doesNotMatch(call.url, /\?/, 'oauth 端点不得携带查询串')
+  assert.doesNotMatch(call.url, /\?/, '无筛选不得携带查询串')
   assert.equal(call.headers.Authorization, 'Bearer TK2')
   assert.deepEqual(out, [{ song_id: 9 }])
+})
+
+test('queryUserRecords：筛选条件走 query string，数组展开为重复键，undefined 不上送', async () => {
+  const calls = stubFetch((u) => u.includes('/oauth/token')
+    ? { body: { access_token: 'TK3', expires_in: 300 } }
+    : { body: { records: [{ song_id: 7 }, { song_id: 8 }] } })
+
+  const api = new DivingFishAPI(114521)
+  const out = await api.queryUserRecords({ song_id: 371, level: '13+', fc: ['ap', 'app'], version: ['彩'] })
+
+  const call = findCall(calls, '/player/records')
+  assert.ok(call, '应打到 /player/records')
+  assert.match(call.url, /[?&]song_id=371/)
+  assert.match(call.url, /[?&]level=13%2B/, 'URLSearchParams 会把 + 编码为 %2B')
+  assert.match(call.url, /[?&]fc=ap&fc=app/, '数组按 httpx 语义展开成重复键（非逗号拼接）')
+  assert.match(call.url, /[?&]version=%E5%BD%A9/)
+  assert.doesNotMatch(call.url, /(ds|fs|plate|level_index)=/, '未给的筛选项不得上送')
+  assert.equal(call.headers.Authorization, 'Bearer TK3')
+  assert.deepEqual(out, [{ song_id: 7 }, { song_id: 8 }])
+})
+
+test('queryUserRecords：records 缺失时回退空数组', async () => {
+  stubFetch((u) => u.includes('/oauth/token')
+    ? { body: { access_token: 'TK4', expires_in: 300 } }
+    : { body: {} })
+  const api = new DivingFishAPI(114522)
+  assert.deepEqual(await api.queryUserRecords({ song_id: 1 }), [])
 })
 
 // =====================================================================
@@ -178,24 +150,23 @@ test('lxnsFormatResult：已带 10000 偏移的 id 不再二次偏移（旧快�
 // 403 分源：公开查询 vs 代用户端点（真机反馈：绑定好好的却被报「尚未授权」）
 // =====================================================================
 
-test('403 映射：oauth 用户的 B50（公开 /query/player）不再被误报成「尚未授权」', async () => {
+test('403 映射：公开查询 vs OAuth 代查端点（真机反馈：绑定好好的却被报「尚未授权」）', async () => {
   const { DivingFishUserDisabledQueryError, DivingFishNotAuthorizedError } =
     await import('../lib/client/errors.js')
 
-  // ① oauth 用户的 B50 走公开端点（不带凭据），用户没开「允许他人查询」→ 403
+  // ① b50 走公开端点（不带凭据），用户没开「允许他人查询」→ 403
   stubFetch(() => ({ status: 403, body: { message: 'user not allow to query' } }))
   const api = new DivingFishAPI(114518)
-  api.oauth = true // 强制走 oauth 分支（不依赖本机是否配了 df 凭据，CI 同款）
   await assert.rejects(() => api.queryUserB50(), DivingFishUserDisabledQueryError,
     '公开端点 403 应说「该用户禁止了其他人获取数据」，而不是冤枉绑定')
 
-  // ② 代用户端点（/player/*）403 才是真的没授权
+  // ② /player/records 源 efa55a9 后必然携带 Bearer，403 即授权问题（判据是端点而非 oauth 配置）
   stubFetch(u => (u.includes('/oauth/token')
     ? { body: { access_token: 'TK', expires_in: 300 } }
     : { status: 403, body: { message: 'forbidden' } }))
   await assert.rejects(() => new DivingFishAPI(114519).queryUserRecords(), DivingFishNotAuthorizedError)
 
-  // ③ 非 oauth（开发者 token 路线）403 仍是「用户禁止他人查询」，与源一致
+  // ③ 公开端点 403 仍是「用户禁止他人查询」，与源一致
   stubFetch(() => ({ status: 403, body: {} }))
   await assert.rejects(() => new DivingFishAPI(null, 'someone').queryUserB50(), DivingFishUserDisabledQueryError)
 })
