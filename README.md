@@ -63,13 +63,15 @@ TRSS-Yunzai v3 舞萌DX（maimai DX）查询插件 —— 移植自 [nonebot-plu
 #mai alias <词> 查别名 / alias apply <ID> <别名> 申请 / vote <ID> 同意 / votes 当前投票
 #   / alias local <ID> <别名> 本地别名 / alias sync 更新别名库
 #mai push on|off 群别名推送开关 / push global on|off 全局（仅主人）
+#mai 创建机厅 <名称> / 删除机厅 <名|别名> / 添加机厅别名 名->别名 / 删除机厅别名 / 机厅列表（均群管；亦可省命令头直发 #创建机厅）
+#   机厅人数互助上报·免前缀口语：机厅j | 机厅几 查人数 · 机厅3 上报 · 机厅+1 / 机厅-2 增减（减到负数拒绝；名与别名群内唯一）
 #mai 更新 / 强制更新 / download（资源包）/ sync（曲库）—— 均仅主人
 #mai update —— 刷新并缓存本人 B50 与全量成绩（人人可用，非管理命令）
 ```
 
 </details>
 
-口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表` 等。
+口语指令（无需前缀）保留：`今天mai什么`、`来个紫14`、`今日舞萌`、`XX是什么歌`、`我要上20分`、`XX有什么别名`、`真极完成表`，以及群内建厅后的 `机厅j`（查人数）、`机厅3` / `机厅+1` / `机厅-2`（上报人数）等。
 
 <details>
 <summary><strong>相比原插件的行为变化</strong></summary>
@@ -192,6 +194,7 @@ git clone https://github.com/Temmie0125/mai-plugin mai-plugin   # 或直接解�
 
 - `data/user.json`：用户绑定与主题（自 NoneBot 版 `user.db` JSON 化）；
 - `data/group.json`：群开关（猜歌 / 别名推送，**默认全关**，白名单语义——只有显式开过的群才生效）；
+- `data/arcade.json`：机厅人数（`#创建机厅` 后的群内互助上报数据，按群分组，行级合并落盘）；
 - `data/music/`：曲库/别名/牌子运行时缓存（`#mai sync` 重建）；
 - `data/score/`：玩家成绩缓存（`b50/<用户键>.json` 与 `records/<用户键>.json`，每日本地缓存，`#mai update` 强制刷新）。成绩可再生，故不做备份轮转；解绑**不删除**——文件带数据源戳记，切换数据源即自动判定过期重拉。
 

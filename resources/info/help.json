@@ -370,5 +370,63 @@
         "desc": "版本牌子完成表 / 进度"
       }
     ]
+  },
+  {
+    "group": "机厅人数",
+    "list": [
+      {
+        "title": "创建机厅",
+        "params": "<名称>",
+        "eg": "#创建机厅 机厅",
+        "desc": "为本群创建机厅，供成员互助上报人数（命令头可省）",
+        "permission": "admin",
+        "scene": "group"
+      },
+      {
+        "title": "删除机厅",
+        "params": "<名称|别名>",
+        "eg": "#删除机厅 机厅",
+        "desc": "删除机厅（级联其全部别名）",
+        "permission": "admin",
+        "scene": "group"
+      },
+      {
+        "title": "添加机厅别名",
+        "params": "<名称>-><别名>",
+        "eg": "#添加机厅别名 机厅->jt",
+        "desc": "为机厅添加短别名（群内名与别名统一唯一）",
+        "permission": "admin",
+        "scene": "group"
+      },
+      {
+        "title": "删除机厅别名",
+        "params": "<名称>-><别名>",
+        "eg": "#删除机厅别名 机厅->jt",
+        "desc": "删除机厅别名",
+        "permission": "admin",
+        "scene": "group"
+      },
+      {
+        "title": "机厅列表",
+        "eg": "#机厅列表",
+        "desc": "列出本群全部机厅（名称/别名/当前人数）",
+        "permission": "admin",
+        "scene": "group"
+      },
+      {
+        "title": "<名称|别名>j",
+        "params": "<名称|别名>j|几",
+        "eg": "机厅j / jtj",
+        "desc": "查询机厅当前人数与最后上报（免前缀口语）",
+        "scene": "group"
+      },
+      {
+        "title": "<名称|别名>±<人数>",
+        "params": "<名称|别名><数字|±N>",
+        "eg": "机厅3 / 机厅+1 / 机厅-2",
+        "desc": "上报机厅人数（免前缀口语；减到负数会被拒绝）",
+        "scene": "group"
+      }
+    ]
   }
 ]
