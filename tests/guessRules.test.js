@@ -198,6 +198,43 @@ test('答题兜底：答错静默放行、答对出卡并结束对局', async ()
   }
 })
 
+test('翻开：免头形式在无开字母对局时 return false 放行（不抢 phi 等插件的同形命令）', async () => {
+  const { inst, replies } = mkInst(MaiGuess)
+
+  // 无对局：免头的一律放行、零回复；宿主据 false 继续投递给后续插件
+  for (const msg of ['#开  A', '#open J', '/open 2', '#出J', '#翻开 A']) {
+    assert.equal(await inst.open(mkE(msg)), false, `应放行：${msg}`)
+  }
+  assert.equal(await inst.open({ ...mkE('#open J'), isGroup: false, group_id: undefined }), false, '私聊同样放行')
+  assert.equal(replies.length, 0, '放行时不该有任何回复（含曲库未就绪报错）')
+
+  // 在局的是别类游戏（猜歌）：仍不是本插件的开字母，照样放行
+  g.startTextGame(111, { song: SONG, img: 'IMG', send: () => {}, card: async () => 'CARD' })
+  try {
+    assert.equal(await inst.open(mkE('#open J')), false)
+    assert.equal(replies.length, 0)
+  } finally { g.endGame(111) }
+
+  // 带命令头是本插件专属：无对局要给提示，不静默
+  assert.equal(await inst.open(mkE('#mai open J')), true)
+  assert.equal(replies.at(-1), '该群没有正在进行的开字母')
+})
+
+test('翻开：有开字母对局时两种形态都消费，且只吃本群', async () => {
+  const { inst, replies } = mkInst(MaiGuess)
+  const sent = []
+  assert.ok(g.startLetterGame(111, { send: m => sent.push(m), starter: 114514, starterName: 't', count: 1 }))
+  try {
+    assert.equal(await inst.open(mkE('#open T')), true, '免头形式在局中应被消费')
+    assert.equal(sent.length, 1, '板面更新由 lib 发出')
+    assert.equal(await inst.open(mkE('#mai open T')), true)
+    assert.equal(sent.length, 2)
+    assert.equal(replies.length, 0, '在局中不该走「没有对局」提示')
+    // 别的群没开局 → 那边的免头命令仍放行
+    assert.equal(await inst.open(mkE('#open T', 222)), false)
+  } finally { g.endGame(111) }
+})
+
 test('群开关：未开启的群起手被拒并给引导（白名单语义）', async () => {
   const { inst, replies } = mkInst(MaiGuess)
   // 未设置过的群 → guess 默认 false

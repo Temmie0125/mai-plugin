@@ -31,9 +31,10 @@ const REG_LETTER = () => new RegExp(`^[#/]${H()}\\s*(?:letter|ltr|开字母)\\s*
 /**
  * 翻开一个字母。**必须恰好一个字符**（`\s*([^\s])\s*$`），这同时排除了与起手命令的歧义：
  * `#mai 开字母` 在 `开` 之后还剩「字母」两字，故不匹配本规则、只会落在 REG_LETTER 上。
- * `(?:${H()}\s*)?` 让 `#open X` 与 `#mai open X` 都可用。
+ * `(${H()}\s*)?` 让 `#open X` 与 `#mai open X` 都可用；命令头单独捕获（组 1，字母在组 2）——
+ * 免头形式与 phi-plugin 等的开字母同形，handler 据此决定「无本插件对局时放行还是报错」。
  */
-const REG_OPEN = () => new RegExp(`^[#/](?:${H()}\\s*)?(?:open|翻开|打开|揭开|出|开)\\s*([^\\s])\\s*$`)
+const REG_OPEN = () => new RegExp(`^[#/](${H()}\\s*)?(?:open|翻开|打开|揭开|出|开)\\s*([^\\s])\\s*$`)
 /** 随机翻开一个字符（对齐 phi 的 `getTip`；tips/tip 两种拼法都收） */
 const REG_TIPS = () => new RegExp(`^[#/]${H()}\\s*(?:tips?|提示)\\s*$`)
 /**
@@ -129,12 +130,22 @@ export class MaiGuess extends MaiPlugin {
     return true
   }
 
-  /** #open X / #出X —— 翻开一个字母 */
+  /**
+   * #open X / #出X —— 翻开一个字母
+   *
+   * 免头形式（`#open X` / `#开 X`）是**共享命名空间**：phi-plugin 等的开字母用的是同一句话。
+   * 故本群没有本插件的开字母对局时必须 `return false` 放行——`return true` 会让宿主中断投递，
+   * 别的插件永远收不到自己的翻开命令。带命令头（`#mai open X`）才是本插件专属，此时照常回提示。
+   * 不走 ensureReady：对局存在即曲库已就绪，而未就绪的报错同样不该落在别人的命令上。
+   */
   async open(e) {
-    if (!(await ensureReady(e))) return true
-    const letter = ((e.msg.match(REG_OPEN()) || [])[1] || '').trim()
+    const m = e.msg.match(REG_OPEN()) || []
+    const letter = (m[2] || '').trim()
     if (!letter) return false
-    await openLetter(e.group_id, letter)
+    // null = 本群没有进行中的开字母（含私聊、在局的是猜歌/弗一把）
+    if (e.isGroup && (await openLetter(e.group_id, letter))) return true
+    if (!m[1]) return false
+    await this.reply('该群没有正在进行的开字母', true)
     return true
   }
 
